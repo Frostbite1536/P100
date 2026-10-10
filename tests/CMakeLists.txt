@@ -80,3 +80,20 @@ if(Python3_Interpreter_FOUND)
     set_tests_properties(${kind}_dryrun PROPERTIES TIMEOUT 60)
   endforeach()
 endif()
+
+# Decode predictions and compile-only llama.cpp dot-product SASS fixtures.
+if(Python3_Interpreter_FOUND)
+  add_test(NAME decode_model
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/decode_model_check.py)
+  if(DEFINED ENV{P100_NVCC})
+    set(_vecdot_nvcc "$ENV{P100_NVCC}")
+  else()
+    set(_vecdot_nvcc "/home/p51/Github/P100/tools/cuda-12.8/bin/nvcc")
+  endif()
+  if(EXISTS "${_vecdot_nvcc}")
+    add_test(NAME vecdot_sass
+      COMMAND ${CMAKE_COMMAND} -E env "P100_NVCC=${_vecdot_nvcc}" "PYTHON=${Python3_EXECUTABLE}"
+              ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/decode_model_check.py --sass)
+    set_tests_properties(vecdot_sass PROPERTIES TIMEOUT 180)
+  endif()
+endif()
