@@ -1,4 +1,4 @@
-foreach(name test_fp16 test_reference test_tiled_model error_budget)
+foreach(name test_fp16 test_reference test_tiled_model error_budget test_tiled_model_sm60 error_budget_sm60)
   add_executable(${name} ${name}.cpp)
   target_link_libraries(${name} PRIVATE p100_ref)
 endforeach()
@@ -10,6 +10,9 @@ foreach(case matrix masked rounding validation)
   add_test(NAME tiled_${case} COMMAND test_tiled_model ${case})
 endforeach()
 add_test(NAME error_budget COMMAND error_budget)
+add_test(NAME test_tiled_model_sm60 COMMAND test_tiled_model_sm60)
+# The full Release run exceeds 120 s; --long includes the 32768-key shapes.
+add_test(NAME error_budget_sm60 COMMAND error_budget_sm60)
 
 
 # Needs the CUDA runtime (top-level block); skipped on CPU-only builds.
