@@ -22,8 +22,39 @@ if(TARGET p100_p2p)
   endforeach()
 endif()
 
-# bench/analyze.py must parse real test-backend-ops SQL output (fixture: CPU run at bench/LLAMA_COMMIT).
+# Static sm_60 controls use the active .venv (including the main checkout's
+# interpreter in worktrees), with the same wheel discovery as the report tool.
 find_package(Python3 COMPONENTS Interpreter)
+if(Python3_Interpreter_FOUND)
+  execute_process(
+    COMMAND ${Python3_EXECUTABLE} -c
+      "import ctypes, runpy, sys; tool = runpy.run_path(sys.argv[1]); ctypes.CDLL(str(tool['NV'] / 'cuda_nvrtc/lib/libnvrtc.so.12')); sys.exit(0 if tool['PTXAS'].is_file() else 1)"
+      ${PROJECT_SOURCE_DIR}/bin/sm60-report.py
+    RESULT_VARIABLE _sm60_toolchain_result
+    OUTPUT_QUIET ERROR_QUIET)
+  if(_sm60_toolchain_result EQUAL 0)
+    foreach(control ok spill smem)
+      add_test(NAME sm60_report_${control}
+        COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/bin/sm60-report.py
+                ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/sm60/${control}.cu)
+    endforeach()
+    set_tests_properties(sm60_report_spill sm60_report_smem PROPERTIES WILL_FAIL TRUE)
+    foreach(control dp4a wmma)
+      # Explicit paths bypass the default fixture exclusion in the checker.
+      configure_file(fixtures/sm60/${control}.cu sm60/${control}.cu COPYONLY)
+      add_test(NAME forbidden_${control}
+        COMMAND bash ${PROJECT_SOURCE_DIR}/bin/check-forbidden.sh
+                ${CMAKE_CURRENT_BINARY_DIR}/sm60/${control}.cu)
+      set_tests_properties(forbidden_${control} PROPERTIES WILL_FAIL TRUE)
+    endforeach()
+  else()
+    message(STATUS "P100: .venv NVRTC/ptxas unavailable; skipping sm_60 tooling controls")
+  endif()
+else()
+  message(STATUS "P100: Python unavailable; skipping sm_60 tooling controls")
+endif()
+
+# bench/analyze.py must parse real test-backend-ops SQL output (fixture: CPU run at bench/LLAMA_COMMIT).
 if(Python3_Interpreter_FOUND)
   add_test(NAME analyze_tbo
     COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/bench/analyze.py tbo
