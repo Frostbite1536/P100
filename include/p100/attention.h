@@ -58,6 +58,13 @@ struct TiledModelConfig {
                                  // chunk of d_qk (models an FP16-accumulate k-loop, e.g. HFMA2 chains)
     bool p_fp16 = true;          // round P = exp(x - m) to FP16 before P*V (FP16 operand of the P*V product)
     bool o_fp16_out = true;      // round final O to FP16 (kernel output dtype)
+    bool qk_scale_in_q = false;  // FP32 scale into Q, then round Q to FP16
+    float qk_q_prescale = 1.0f;  // round FP16 Q * prescale; divide the FP32 dot by prescale
+    bool qk_products_fp16 = false;  // round each product to FP16; accumulate in FP32
+    int qk_half2_chain = 0;      // N FP16 FMAs per even/odd lane, then flush to FP32
+    float kq_max_offset = 0.0f;  // running max = max(previous, tile_max + offset)
+    bool l_from_unrounded_p = false;  // sum FP32 P before optional FP16 rounding
+    bool o_accum_fp16 = false;  // FP16 tile rescale and per-key fused P*V updates
 };
 
 void attention_tiled_model(const AttnParams& p, const TiledModelConfig& cfg, const float* q, const float* k,
@@ -66,5 +73,7 @@ void attention_tiled_model(const AttnParams& p, const TiledModelConfig& cfg, con
 // Round-to-nearest-even float -> IEEE binary16 -> float, with overflow to +/-inf and
 // subnormals, matching __float2half_rn.
 float round_to_fp16(float x);
+// Direct binary64 -> binary16 rounding, avoiding an intermediate binary32 rounding.
+float round_to_fp16(double x);
 
 }  // namespace p100
