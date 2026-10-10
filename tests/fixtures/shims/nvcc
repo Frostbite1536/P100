@@ -1,0 +1,5 @@
+#!/bin/bash
+# FAKE version probe; compilation is deliberately forbidden.
+set -euo pipefail
+[ "$*" = --version ] || { echo 'FAKE nvcc: compilation forbidden' >&2; exit 2; }
+printf '%s\n' 'FAKE NVIDIA CUDA compiler fixture' 'Cuda compilation tools, release 12.8, V12.8.0'

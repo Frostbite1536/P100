@@ -1,0 +1,24 @@
+#!/bin/bash
+# FAKE end-to-end fixture; model paths are labels and are never opened.
+set -euo pipefail
+exec "${PYTHON:-python3}" - "$@" <<'PY'
+import itertools
+import json
+import os
+import sys
+
+args = sys.argv[1:]
+assert len(args) % 2 == 0
+opts = dict(zip(args[::2], args[1::2]))
+assert opts['-dev'] == 'CUDA0'
+assert opts['-ctk'] == opts['-ctv'] == 'f16,q8_0,q4_0'
+assert (opts['-p'], opts['-n'], opts['-d']) == ('8', '64', '16384')
+assert opts['-fa'] == 'on' and opts['-o'] == 'jsonl'
+with open(os.environ['SHIM_CALL_LOG'], 'a') as f:
+    f.write(json.dumps(dict(tool='lb', opts=opts)) + '\n')
+print('FAKE llama-bench fixture; synthetic numbers, no model or GPU accessed', file=sys.stderr)
+for k, v in itertools.product(('f16', 'q8_0', 'q4_0'), repeat=2):
+    print(json.dumps(dict(model_type='FAKE-model', n_prompt=8, n_gen=64, n_depth=16384,
+                         n_ubatch=512, type_k=k, type_v=v, flash_attn=1, split_mode='layer',
+                         devices='CUDA0', avg_ts=100.0, stddev_ts=1.0, fixture='FAKE')))
+PY

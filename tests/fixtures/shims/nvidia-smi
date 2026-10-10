@@ -1,0 +1,13 @@
+#!/bin/bash
+# FAKE fixture: never accesses a GPU.
+set -euo pipefail
+case "$*" in
+  '--query-gpu=name --format=csv,noheader') printf '%s\n' Tesla\ P100-PCIE-16GB Tesla\ P100-PCIE-16GB ;;
+  -L) printf '%s\n' 'GPU 0: Tesla P100-PCIE-16GB (UUID: FAKE-0)' 'GPU 1: Tesla P100-PCIE-16GB (UUID: FAKE-1)' ;;
+  -q) printf '%s\n' 'FAKE nvidia-smi -q fixture' 'Product Name: Tesla P100-PCIE-16GB' 'FB Memory Total: 16384 MiB' ;;
+  'topo -m') printf '%s\n' 'FAKE topology' '      GPU0 GPU1 CPU Affinity' 'GPU0  X    PHB  0-15' 'GPU1  PHB  X    0-15' ;;
+  'topo -p2p r') printf '%s\n' 'FAKE peer-read topology' '      GPU0 GPU1' 'GPU0  X    OK' 'GPU1  OK   X' ;;
+  --query-gpu=clocks.sm,*) printf '%s\n' 'FAKE: 1328, 715, 42, 100.0, 0x0000000000000000' 'FAKE: 1328, 715, 43, 100.0, 0x0000000000000000' ;;
+  --query-gpu=*) printf '%s\n' 'FAKE GPU metadata (not a measurement)' '0, Tesla P100-PCIE-16GB, FAKE-driver, 3, 16, 1328, 715, 250.0, 16384' '1, Tesla P100-PCIE-16GB, FAKE-driver, 3, 16, 1328, 715, 250.0, 16384' ;;
+  *) echo "unsupported FAKE nvidia-smi invocation: $*" >&2; exit 2 ;;
+esac

@@ -67,3 +67,16 @@ if(Python3_Interpreter_FOUND)
             ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/lb-r3.jsonl --labels a,b)
   set_tests_properties(analyze_lb_rounds PROPERTIES PASS_REGULAR_EXPRESSION "105\\.00 \\(100\\.00–110\\.00, n=2\\) \\| 130\\.00 ± 1\\.00 \\| \\+23\\.8%")
 endif()
+
+# Fixture commands validate the Phase 0 and patch harness plumbing without CUDA,
+# llama.cpp, models, worktree writes, or persistent benchmark output.
+if(Python3_Interpreter_FOUND)
+  find_program(P100_BASH_EXECUTABLE bash REQUIRED)
+  foreach(kind phase0 patches)
+    add_test(NAME ${kind}_dryrun
+      COMMAND ${CMAKE_COMMAND} -E env "PYTHON=${Python3_EXECUTABLE}"
+              ${P100_BASH_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/shims/dryrun
+              ${PROJECT_SOURCE_DIR} ${kind})
+    set_tests_properties(${kind}_dryrun PROPERTIES TIMEOUT 60)
+  endforeach()
+endif()
