@@ -1,0 +1,37 @@
+#!/bin/bash
+# FAKE backend fixture: validates arguments, emits synthetic SQL, never runs kernels.
+set -euo pipefail
+exec "${PYTHON:-python3}" - "$@" <<'PY'
+import itertools
+import json
+import os
+import re
+import sys
+
+args = sys.argv[1:]
+mode = args.pop(0)
+assert mode in ('support', 'test', 'perf'), mode
+opts = dict(zip(args[::2], args[1::2]))
+assert len(args) % 2 == 0
+assert opts['-b'] in ('CUDA0', 'CUDA1')
+op = opts['-o']
+assert op in ('FLASH_ATTN_EXT', 'MUL_MAT')
+assert set(opts) <= {'-b', '-o', '-p', '--output'}
+with open(os.environ['SHIM_CALL_LOG'], 'a') as f:
+    f.write(json.dumps(dict(tool='tbo', mode=mode, opts=opts)) + '\n')
+if mode != 'perf':
+    assert '-p' not in opts, 'correctness must run the full suite'
+    print(f'FAKE {op} {opts["-b"]}: OK; 1/1 passed (no hardware tested)')
+    sys.exit(0)
+assert opts['--output'] == 'sql'
+print('-- FAKE synthetic timings for plumbing tests only')
+print('CREATE TABLE test_backend_ops (op_name TEXT, op_params TEXT, supported INTEGER, time_us REAL, test_mode TEXT);')
+count = 0
+for hs, gqa, kv, nb, dtype in itertools.product((128, 256), (4, 6, 8), (4096, 32768), (3, 4, 8, 16), ('f16', 'q8_0', 'q4_0')):
+    params = f'hsk={hs},hsv={hs},nh=4,nr23=[{gqa},1],kv={kv},nb={nb},mask=1,type_K={dtype},type_V={dtype}'
+    if '-p' in opts and not re.search(opts['-p'], params):
+        continue
+    print(f"INSERT INTO test_backend_ops VALUES ('{op}', '{params}', 1, 1000.0, 'perf');")
+    count += 1
+assert count == 144, f'perf filter lost required shapes: {count}/144'
+PY

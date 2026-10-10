@@ -1,0 +1,14 @@
+#!/bin/bash
+# FAKE profiler probe, including the unsupported-chip path.
+set -euo pipefail
+case "$*" in
+  --version) echo 'FAKE Nsight Compute fixture' ;;
+  --list-chips)
+    case "${SHIM_NCU_MODE:-supported}" in
+      supported) echo 'FAKE supported chip: GP100' ;;
+      unsupported) echo 'FAKE supported chip: GA100' ;;
+      error) echo 'FAKE ncu: chip probe failed' >&2; exit 1 ;;
+      *) exit 2 ;;
+    esac ;;
+  *) exit 2 ;;
+esac

@@ -1,0 +1,89 @@
+#!/bin/bash
+# CTest driver. Every output is temporary and removed even after a failed assertion.
+set -euo pipefail
+exec "${PYTHON:-python3}" - "$@" <<'PY'
+import itertools
+import json
+import os
+from pathlib import Path
+import re
+import subprocess
+import sys
+import tempfile
+
+root = Path(sys.argv[1]).resolve()
+kind = sys.argv[2]
+shims = root / 'tests/fixtures/shims'
+with tempfile.TemporaryDirectory(prefix=f'p100-{kind}-') as tmp:
+    tmp = Path(tmp)
+    env = dict(os.environ, PATH=f'{shims}:{os.environ["PATH"]}', OUT=str(tmp / 'results'),
+               SHIM_CALL_LOG=str(tmp / 'calls.jsonl'), FORCE='0')
+    # Isolate the tests from inherited benchmark settings and local model lists.
+    for key in ('TBO', 'LB', 'MODELS', 'VARIANTS', 'ROUNDS', 'LB_ROUNDS', 'STEPS', 'DRYRUN', 'LLAMA', 'TAG', 'SHIM_NCU_MODE'):
+        env.pop(key, None)
+    env['LLAMA'] = str(tmp / 'absent-llama')
+    out = Path(env['OUT'])
+    def run(script):
+        subprocess.run(['bash', str(root / script)], cwd=root, env=env, check=True)
+    def require(name, needle=None):
+        path = out / name
+        assert path.is_file() and path.stat().st_size, f'missing/empty {path}'
+        text = path.read_text()
+        if needle is not None:
+            assert needle in text, f'{name}: missing {needle!r}'
+        return text
+    if kind == 'phase0':
+        env.update(STEPS='env support test perf', TBO=str(shims / 'test-backend-ops'), LB=str(shims / 'llama-bench'))
+        run('bench/phase0.sh')
+        text = require('env.txt', 'GP100')
+        assert 'FAKE topology' in text and 'FAKE peer-read topology' in text
+        require('nvidia-smi-q.txt', 'FAKE')
+        for dev in ('CUDA0', 'CUDA1'):
+            require(f'fa-support-{dev}.txt', 'FAKE')
+            for op in ('fa', 'mulmat'):
+                require(f'{op}-test-{dev}.txt', 'passed')
+                require(f'{op}-perf-{dev}.sql', '-- FAKE')
+                assert (out / f'{op}-perf-{dev}.err').is_file()
+        calls = [json.loads(line) for line in Path(env['SHIM_CALL_LOG']).read_text().splitlines()]
+        expected = {(mode, op, dev) for dev in ('CUDA0', 'CUDA1')
+                    for mode, op in [('support', 'FLASH_ATTN_EXT'), ('test', 'FLASH_ATTN_EXT'),
+                                     ('test', 'MUL_MAT'), ('perf', 'FLASH_ATTN_EXT'), ('perf', 'MUL_MAT')]}
+        assert len(calls) == 10
+        assert {(c['mode'], c['opts']['-o'], c['opts']['-b']) for c in calls} == expected
+        # A failing optional profiler must leave a useful diagnosis and finish the env step.
+        env.update(STEPS='env', SHIM_NCU_MODE='error')
+        run('bench/phase0.sh')
+        require('env.txt', 'ncu: no GP100')
+        require('run.log', 'done:')
+    elif kind == 'patches':
+        env.update(DRYRUN='1', STEPS='micro build test perf lb', ROUNDS='2', LB_ROUNDS='2',
+                   VARIANTS='upstream conv conv8', MODELS='/FAKE/model.gguf',
+                   WORK=str(tmp / 'must-not-exist'), LLAMA_SRC=str(tmp / 'absent-llama'))
+        run('bench/patches/run.sh')
+        assert not Path(env['WORK']).exists(), 'dry run created a worktree/build directory'
+        require('env.txt', 'FAKE')
+        summary = require('summary.md', 'FAKE fixture')
+        assert 'analyze tbo failed' not in summary and 'analyze lb failed' not in summary
+        assert 'type_K=f16' in summary and 'type_K=q8_0' in summary and 'type_K=q4_0' in summary
+        assert '## llama-bench' in summary
+        variants = ('upstream', 'conv', 'conv8')
+        for v in variants:
+            for op in ('fa', 'mulmat'):
+                require(f'{v}.{op}-test-CUDA0.txt', 'passed')
+            for r in (1, 2):
+                sql = require(f'{v}.perf.r{r}.sql', '-- FAKE')
+                assert sql.count('INSERT INTO') == 144
+                rows = [json.loads(line) for line in require(f'{v}.model.kv.r{r}.jsonl').splitlines()]
+                assert {(row['type_k'], row['type_v']) for row in rows} == set(itertools.product(('f16', 'q8_0', 'q4_0'), repeat=2))
+        calls = [json.loads(line) for line in Path(env['SHIM_CALL_LOG']).read_text().splitlines()]
+        assert [c['tool'] for c in calls] == ['tbo'] * 12 + ['lb'] * 6
+        assert all(c['opts']['-b'] == 'CUDA0' for c in calls if c['tool'] == 'tbo')
+        assert [c['mode'] for c in calls[:6]] == ['test'] * 6
+        log = require('run.log', 'skipping microbench')
+        for pattern in (r'kernel perf (\w+) round (\d+)', r'llama-bench kv model (\w+) round (\d+)'):
+            assert re.findall(pattern, log) == [(v, str(r)) for r in (1, 2) for v in variants]
+        assert log.count('gpu[sm,mem,temp,power,throttle]: FAKE') == 12
+    else:
+        raise AssertionError(f'unknown dry-run kind: {kind}')
+print(f'{kind}: FAKE plumbing checks passed; temporary results removed')
+PY
