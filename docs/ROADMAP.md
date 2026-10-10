@@ -12,11 +12,13 @@ every change small enough to upstream or carry as a patch. Background and hypoth
   limits. ✅ (ticket p1; note: volta-fa's 64×64 D=128 tile needs 51 KB smem, over sm_60's 48 KB, so P100 FA tiles are smaller)
 - P-2 Phase 0 kit: `bench/phase0.sh` for one and two P100s, `bench/patches/run.sh` (upstream/conv/conv8);
   dry-run tests with stand-in commands. ✅ (ticket p2)
-- P-3 Numerics for FP16 products (H2): extend the tiled CPU model with "products rounded to FP16, Q pre-scaled
-  by s" and "half2 chain of N terms", and add `error_budget` rows for llama.cpp's current TILE scheme and for
-  N = 2, 4, 8. Answers whether a faster FA TILE inner loop is allowed before anyone writes it.
-- P-4 Decode cost model (H1): `bin/decode-model.py`, bytes vs ALU instructions per weight type for MMVQ on
-  sm_60 (from SASS counts like `docs/research/volta-fa-lessons.md` §2), to be calibrated on day one.
+- P-3 Numerics model for llama.cpp's sm_60 FA scheme and `half2` chains (H2). ✅ (ticket p3) Findings:
+  `docs/research/pre-hardware-findings-2026-10-10.md` §2: the FP16 output accumulator is a long-context risk
+  (model worst case 61% at 32K keys with biased V; real key split not yet modelled); `half2` chains: 2 terms at most.
+- P-4 Decode cost model (H1). ✅ (ticket p4) `bin/decode-model.py` + llama.cpp's real per-type SASS counts:
+  predicted ALU-bound at batch 1 for q4_0/q4_K/q5_K/q6_K, every quantised type at batch ≥ 4 (uncalibrated; §1).
+- P-5 Refine the FA model with keys per FP16 accumulator from a trace of llama.cpp's warp/parallel-block split;
+  add a biased-V FLASH_ATTN_EXT case to the Phase 0 kit.
 - Patches `third_party/patches/0001..0002` (volta-fa 0005/0006): check they apply at the pinned commit and
   build for sm_60 (`-DCMAKE_CUDA_ARCHITECTURES=60` with the local nvcc); MUL_MAT + FA correctness on the
   laptop's Maxwell GPU.
@@ -29,7 +31,8 @@ Variant: PCIe 16 GB (ordered). Record `nvidia-smi -q`, `nvidia-smi topo -m`, hos
 `bench/BASELINE.md`. Then, in this order:
 
 1. Full `test-backend-ops test -o FLASH_ATTN_EXT` and `-o MUL_MAT` on each GPU (crash classes, 3.).
-2. **H1**: `test-backend-ops perf -o MUL_MAT` at batch 1–8 per weight type: achieved GB/s vs HBM roofline.
+2. **H1**: `test-backend-ops perf -o MUL_MAT` at batch 1–8 per weight type: achieved GB/s vs HBM roofline;
+   calibrate `bin/decode-model.py` (`--bw-eff`, `--issue-eff`) and record where it was wrong.
 3. **H2/H3**: FA perf by head dim; llama-bench FA on/off × depth 0–32K.
 4. Quantised KV: llama-bench tg/pp8 at 16K, f16/q8_0/q4_0, upstream vs patches 0001–0002 (**H5**).
 5. **H4**: `p2p_bandwidth` (peer and staged), then llama-bench `-sm layer|tensor` (row split no longer exists for CUDA, llama.cpp #24216) on a model that needs
