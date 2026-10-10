@@ -24,11 +24,12 @@ bin/setup-dev.sh                   # .venv (cmake, ninja, NVRTC/ptxas wheels); W
 export PATH=$PWD/.venv/bin:$PATH   # once per shell
 cmake -S . -B build -G Ninja && cmake --build build && ctest --test-dir build --output-on-failure
 python bin/sm60-report.py src/<dir>/<file>.cu   # static regs/spill/smem for sm_60
+python bin/plan-tiles.py --d 128 --br 32 --bc 64 --warps 4 [--regs N]   # smem/occupancy/roofline (default variant pcie16 = the owner's cards)
 bin/check-forbidden.sh && shellcheck -x bin/*.sh
 
 # P100 box (2 GPUs)
 cmake -S . -B build -G Ninja -DCMAKE_CUDA_ARCHITECTURES=60 && cmake --build build && ctest --test-dir build --output-on-failure
-bench/phase0.sh                    # Phase 0 baseline kit (after ticket p2: llama.cpp MUL_MAT/FA perf, llama-bench grid, 2-GPU split modes)
+bench/phase0.sh                    # Phase 0 baseline kit: llama.cpp FA/MUL_MAT test+perf per GPU, llama-bench grid, P2P, 2-GPU split modes
 build/bench/p2p_bandwidth --csv    # staged vs peer copy bandwidth between the two P100s
 ```
 

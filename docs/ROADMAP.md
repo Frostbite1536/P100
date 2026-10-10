@@ -7,11 +7,11 @@ every change small enough to upstream or carry as a patch. Background and hypoth
 ## Pre-hardware (now, dev laptop)
 
 - P-0 Scaffold: volta-fa's process, numerics contract (reference, tiled model, tolerances, error budget), P2P
-  layer and analysis tools, renamed for P100. ✅ CPU build + 17 tests pass.
-- P-1 Static tooling for sm_60 (ticket `tickets/p1-sm60-tooling.md`): `bin/sm60-report.py`,
-  `bin/check-forbidden.sh` for sm_60, `bin/plan-tiles.py` with GP100 limits.
-- P-2 Phase 0 kit (ticket `tickets/p2-phase0-kit.md`): `bench/phase0.sh` for one and two P100s, `bench/patches/run.sh`,
-  box setup script; dry-run with stand-in commands.
+  layer and analysis tools, renamed for P100. ✅
+- P-1 Static tooling for sm_60: `bin/sm60-report.py`, `bin/check-forbidden.sh`, `bin/plan-tiles.py` with GP100
+  limits. ✅ (ticket p1; note: volta-fa's 64×64 D=128 tile needs 51 KB smem, over sm_60's 48 KB, so P100 FA tiles are smaller)
+- P-2 Phase 0 kit: `bench/phase0.sh` for one and two P100s, `bench/patches/run.sh` (upstream/conv/conv8);
+  dry-run tests with stand-in commands. ✅ (ticket p2)
 - P-3 Numerics for FP16 products (H2): extend the tiled CPU model with "products rounded to FP16, Q pre-scaled
   by s" and "half2 chain of N terms", and add `error_budget` rows for llama.cpp's current TILE scheme and for
   N = 2, 4, 8. Answers whether a faster FA TILE inner loop is allowed before anyone writes it.
@@ -25,14 +25,14 @@ every change small enough to upstream or carry as a patch. Background and hypoth
 
 ## Phase 0: Baseline on the P100s (first day on hardware)
 
-Record the variant (12/16 GB, PCIe/SXM2), `nvidia-smi -q`, `nvidia-smi topo -m`, host CPU and PCIe layout in
+Variant: PCIe 16 GB (ordered). Record `nvidia-smi -q`, `nvidia-smi topo -m`, host CPU and PCIe layout in
 `bench/BASELINE.md`. Then, in this order:
 
 1. Full `test-backend-ops test -o FLASH_ATTN_EXT` and `-o MUL_MAT` on each GPU (crash classes, 3.).
 2. **H1**: `test-backend-ops perf -o MUL_MAT` at batch 1–8 per weight type: achieved GB/s vs HBM roofline.
 3. **H2/H3**: FA perf by head dim; llama-bench FA on/off × depth 0–32K.
 4. Quantised KV: llama-bench tg/pp8 at 16K, f16/q8_0/q4_0, upstream vs patches 0001–0002 (**H5**).
-5. **H4**: `p2p_bandwidth` (peer and staged), then llama-bench `-sm layer|row|tensor` on a model that needs
+5. **H4**: `p2p_bandwidth` (peer and staged), then llama-bench `-sm layer|tensor` (row split no longer exists for CUDA, llama.cpp #24216) on a model that needs
    both GPUs (Qwen3.8-27B Q4_K_XL, 17.6 GB).
 6. Profiler check: `ncu --list-chips` for GP100; otherwise nsys timelines + test-backend-ops timings.
 

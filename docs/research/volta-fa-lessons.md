@@ -17,7 +17,7 @@ for Phase 0.
 | smem per SM / per block | 96 / 96 KB | 64 / 48 KB | same | same |
 | GPU link | PCIe 3.0 | PCIe 3.0 | PCIe 3.0 | NVLink 1.0 |
 
-Datasheet values, not measured. Which variant was ordered decides the bandwidth roofline (`bench/BASELINE.md`).
+Datasheet values, not measured. **The owner's cards are the PCIe 16 GB variant** (732 GB/s, PCIe 3.0 between the cards, no NVLink); the other columns are for comparison only.
 
 What it means for llama.cpp at `79e2e74` (traced in the source):
 
@@ -43,8 +43,8 @@ About 3.75 instructions per int8 product on the P100 against 0.25 with dp4a. Bac
 Llama-3.1-8B (8.0 G weights per token): dot-product ALU work ≈ 30 G thread-instructions ≈ 6.4 ms even at
 full issue rate (56 SMs × 64 lanes × 1.303 GHz), against 11.6 ms (Q8_0, 8.5 GB) or 6.3 ms (Q4_0) to stream the
 weights at 732 GB/s. Unpacking, scales and address math come on top, and `BFE`/`XMAD` may not issue at full
-rate. So **4-bit decode on a P100 is plausibly ALU-bound**, and Q8_0 may be close; the 12 GB card's lower
-bandwidth shifts the balance back. That is Phase 0 question 1:
+rate. So **4-bit decode on a P100 is plausibly ALU-bound**, and Q8_0 may be close; this applies to the owner's 16 GB
+cards at 732 GB/s (the 12 GB card's 549 GB/s would shift the balance back). That is Phase 0 question 1:
 `test-backend-ops perf -o MUL_MAT` at batch 1 gives achieved GB/s per type against the HBM roofline.
 
 ## 3. What transfers from volta-fa
@@ -95,6 +95,6 @@ absent: Pascal warps run in lockstep.
 
 ## 6. Not known yet
 
-Which P100 variant (12/16 GB, PCIe/SXM2), the host's PCIe topology (same root complex? P2P allowed?), whether
+The host's PCIe topology (same root complex? P2P allowed?), whether
 Nsight Compute 2025.1 still profiles GP100 (`ncu --list-chips`) or only nsys/nvprof are left, and every number
 in §5.

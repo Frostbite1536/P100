@@ -5,7 +5,7 @@ Fill in on the first day with the P100s. Every result file links back here (INV-
 | Field | Value |
 | --- | --- |
 | Where | (home box / cloud provider + instance type) |
-| GPUs | 2× Tesla P100 — variant: (PCIe 12 GB / PCIe 16 GB / SXM2 16 GB), VBIOS, power limit |
+| GPUs | 2× Tesla P100 **PCIe 16 GB** (ordered 2026-10-10; datasheet: 56 SMs, 1303 MHz boost, 732 GB/s HBM2, 250 W, no NVLink). Record VBIOS, power limit and measured clocks on arrival |
 | Topology | `nvidia-smi topo -m` (PIX / PXB / PHB / SYS / NV#), PCIe gen and width per card |
 | Host | CPU, RAM, board, BIOS settings (Above 4G, ACS, IOMMU) |
 | Driver | (R580.x) |
