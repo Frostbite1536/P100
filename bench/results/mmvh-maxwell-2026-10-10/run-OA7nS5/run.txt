@@ -1,0 +1,9 @@
+Maxwell, FP32 emulation of half2: not a P100 number
+Binary: /home/p51/Github/P100/.worktrees/p12-mmvh-k56/third_party/llama.cpp/build-mmvh/bin/test-backend-ops
+Filter: type_a=(q4_0|q8_0|q4_K|q5_K|q6_K),type_b=f32,.*n=[1-8],k=
+Quadro M2200, 5.2, 580.178.04
+upstream-test: exit=134 pass=1161 fail=0 unsupported=47
+force-test: exit=134 pass=1161 fail=0 unsupported=47
+force-targeted-test: exit=0 pass=375 fail=0 unsupported=0
+upstream-targeted-perf: exit=0 (Maxwell, FP32 emulation of half2: not a P100 number)
+force-targeted-perf: exit=0 (Maxwell, FP32 emulation of half2: not a P100 number)

@@ -12,8 +12,8 @@ if [[ ! -x "$tbo" ]]; then
     echo "missing executable: $tbo" >&2
     exit 2
 fi
-# All q4_0/q8_0/q4_K MUL_MAT cases with F32 input and n=1..8, including strided controls.
-params='type_a=(q4_0|q8_0|q4_K),type_b=f32,.*n=[1-8],k='
+# All q4_0/q8_0/q4_K/q5_K/q6_K MUL_MAT cases with F32 input and n=1..8, including strided controls.
+params='type_a=(q4_0|q8_0|q4_K|q5_K|q6_K),type_b=f32,.*n=[1-8],k='
 exec 9>/tmp/p100-gpu.lock
 flock 9
 gpu_index=${MMVH_MAXWELL_GPU:-0}
