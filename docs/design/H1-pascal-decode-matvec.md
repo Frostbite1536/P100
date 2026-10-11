@@ -64,12 +64,20 @@ Correctness of layout and indexing: `bin/maxwell-check.sh` on the M2200 (FP32 em
 
 - Load instructions: the prototype loads activations as 32-bit `half2` (16 `LDG` per block per column). At
   B ≥ 4 loads are ~40% of instructions; the patch must use 128-bit loads or stage activations in shared memory.
-- k-quants other than q4_K (q5_K, q6_K: the other half of Q4_K_M files) need their own unpack; q6_K's 2-bit high
-  parts need a second `lop3`. Not yet counted.
+- k-quants other than q4_K need their own unpack (ticket p12, patch 0006). In a Llama-style Q4_K_M file
+  (`src/llama-quant.cpp` at the pin: `use_more_bits` :452, attn_v :590, ffn_down :646-652, output :508) the
+  other type is **q6_K**: `attn_v`/`ffn_down` in 16 of 32 layers plus `output.weight`, about 27% of the weight
+  bytes read per decoded token for Llama-3.1-8B (manager's arithmetic from tensor shapes). q5_K occurs in Q4_K_M
+  only for fused QKV tensors; it matters for Q5_K_M, Q4_K_S and Q3_K_*. q6_K has one scale per 16 weights, so
+  its chain is two runs of 8.
 - llama.cpp fuses gate/up mat-vecs with MMVQ (`ggml_cuda_should_fuse_mul_mat_vec_q`); the new path must either
   support the fusion or be excluded from it without slowing those nodes.
-- The pre-pass is per input vector; llama.cpp shares one q8_1 quantisation between consumers of the same
-  input. Keep that sharing for h16.
+- The pre-pass runs once per mat-vec, like upstream: at the pin `quantize_row_q8_1_cuda` is called inside
+  `ggml_cuda_mul_mat_vec_q` (`mmvq.cu:1536`) for every node, so there is no cross-node sharing to keep (an
+  earlier version of this doc said otherwise). CUDA graphs are disabled below Volta (`ggml-cuda.cu:4621`), so on
+  the P100 each launch costs host time; mmvh launches the same number of kernels as MMVQ (pre-pass in place of
+  the q8_1 quantisation). Sharing h16 between q/k/v and gate/up would remove launches for both paths; only worth
+  doing if Phase 0 shows launch overhead in tg128.
 - MMVQ's thread mapping (`MMVQ_PARAMETERS_GENERIC`: warps per row, rows per block) is tuned for dp4a costs; the
   half2 path may want more rows per warp to amortise activation loads. Tune on the P100, not before.
 

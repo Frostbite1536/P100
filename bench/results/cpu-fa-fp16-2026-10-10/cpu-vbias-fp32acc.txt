@@ -1,0 +1,27 @@
+Testing 1 devices
+
+Backend 1/1: CPU
+  Device description: Intel(R) Xeon(R) CPU E3-1505M v6 @ 3.00GHz
+  Device memory: 64016 MB (64016 MB free)
+
+  FLASH_ATTN_EXT(hsk=128,hsv=128,nh=1,nr23=[4,1],kv=16384,nb=1,mask=0,sinks=0,max_bias=0.000000,logit_softcap=0.000000,prec=f32,type_K=f16,type_V=f16,permute=[0,1,2,3],kv_view=1,v_is_view_of_k=0,n_kv_max=0,v_bias=2.000000): OK
+  FLASH_ATTN_EXT(hsk=128,hsv=128,nh=1,nr23=[4,1],kv=16384,nb=4,mask=0,sinks=0,max_bias=0.000000,logit_softcap=0.000000,prec=f32,type_K=f16,type_V=f16,permute=[0,1,2,3],kv_view=1,v_is_view_of_k=0,n_kv_max=0,v_bias=2.000000): OK
+  FLASH_ATTN_EXT(hsk=128,hsv=128,nh=1,nr23=[4,1],kv=16384,nb=16,mask=0,sinks=0,max_bias=0.000000,logit_softcap=0.000000,prec=f32,type_K=f16,type_V=f16,permute=[0,1,2,3],kv_view=1,v_is_view_of_k=0,n_kv_max=0,v_bias=2.000000): OK
+  FLASH_ATTN_EXT(hsk=128,hsv=128,nh=1,nr23=[4,1],kv=16384,nb=512,mask=0,sinks=0,max_bias=0.000000,logit_softcap=0.000000,prec=f32,type_K=f16,type_V=f16,permute=[0,1,2,3],kv_view=1,v_is_view_of_k=0,n_kv_max=0,v_bias=2.000000): OK
+  FLASH_ATTN_EXT(hsk=128,hsv=128,nh=1,nr23=[4,1],kv=32768,nb=1,mask=0,sinks=0,max_bias=0.000000,logit_softcap=0.000000,prec=f32,type_K=f16,type_V=f16,permute=[0,1,2,3],kv_view=1,v_is_view_of_k=0,n_kv_max=0,v_bias=2.000000): OK
+  FLASH_ATTN_EXT(hsk=128,hsv=128,nh=1,nr23=[4,1],kv=32768,nb=4,mask=0,sinks=0,max_bias=0.000000,logit_softcap=0.000000,prec=f32,type_K=f16,type_V=f16,permute=[0,1,2,3],kv_view=1,v_is_view_of_k=0,n_kv_max=0,v_bias=2.000000): OK
+  FLASH_ATTN_EXT(hsk=128,hsv=128,nh=1,nr23=[4,1],kv=32768,nb=16,mask=0,sinks=0,max_bias=0.000000,logit_softcap=0.000000,prec=f32,type_K=f16,type_V=f16,permute=[0,1,2,3],kv_view=1,v_is_view_of_k=0,n_kv_max=0,v_bias=2.000000): OK
+  FLASH_ATTN_EXT(hsk=128,hsv=128,nh=1,nr23=[4,1],kv=32768,nb=512,mask=0,sinks=0,max_bias=0.000000,logit_softcap=0.000000,prec=f32,type_K=f16,type_V=f16,permute=[0,1,2,3],kv_view=1,v_is_view_of_k=0,n_kv_max=0,v_bias=2.000000): OK
+  FLASH_ATTN_EXT(hsk=256,hsv=256,nh=1,nr23=[4,1],kv=16384,nb=1,mask=0,sinks=0,max_bias=0.000000,logit_softcap=0.000000,prec=f32,type_K=f16,type_V=f16,permute=[0,1,2,3],kv_view=1,v_is_view_of_k=0,n_kv_max=0,v_bias=2.000000): OK
+  FLASH_ATTN_EXT(hsk=256,hsv=256,nh=1,nr23=[4,1],kv=16384,nb=4,mask=0,sinks=0,max_bias=0.000000,logit_softcap=0.000000,prec=f32,type_K=f16,type_V=f16,permute=[0,1,2,3],kv_view=1,v_is_view_of_k=0,n_kv_max=0,v_bias=2.000000): OK
+  FLASH_ATTN_EXT(hsk=256,hsv=256,nh=1,nr23=[4,1],kv=16384,nb=16,mask=0,sinks=0,max_bias=0.000000,logit_softcap=0.000000,prec=f32,type_K=f16,type_V=f16,permute=[0,1,2,3],kv_view=1,v_is_view_of_k=0,n_kv_max=0,v_bias=2.000000): OK
+  FLASH_ATTN_EXT(hsk=256,hsv=256,nh=1,nr23=[4,1],kv=16384,nb=512,mask=0,sinks=0,max_bias=0.000000,logit_softcap=0.000000,prec=f32,type_K=f16,type_V=f16,permute=[0,1,2,3],kv_view=1,v_is_view_of_k=0,n_kv_max=0,v_bias=2.000000): OK
+  FLASH_ATTN_EXT(hsk=256,hsv=256,nh=1,nr23=[4,1],kv=32768,nb=1,mask=0,sinks=0,max_bias=0.000000,logit_softcap=0.000000,prec=f32,type_K=f16,type_V=f16,permute=[0,1,2,3],kv_view=1,v_is_view_of_k=0,n_kv_max=0,v_bias=2.000000): OK
+  FLASH_ATTN_EXT(hsk=256,hsv=256,nh=1,nr23=[4,1],kv=32768,nb=4,mask=0,sinks=0,max_bias=0.000000,logit_softcap=0.000000,prec=f32,type_K=f16,type_V=f16,permute=[0,1,2,3],kv_view=1,v_is_view_of_k=0,n_kv_max=0,v_bias=2.000000): OK
+  FLASH_ATTN_EXT(hsk=256,hsv=256,nh=1,nr23=[4,1],kv=32768,nb=16,mask=0,sinks=0,max_bias=0.000000,logit_softcap=0.000000,prec=f32,type_K=f16,type_V=f16,permute=[0,1,2,3],kv_view=1,v_is_view_of_k=0,n_kv_max=0,v_bias=2.000000): OK
+  FLASH_ATTN_EXT(hsk=256,hsv=256,nh=1,nr23=[4,1],kv=32768,nb=512,mask=0,sinks=0,max_bias=0.000000,logit_softcap=0.000000,prec=f32,type_K=f16,type_V=f16,permute=[0,1,2,3],kv_view=1,v_is_view_of_k=0,n_kv_max=0,v_bias=2.000000): OK
+  16/16 tests passed
+  Backend CPU: OK
+1/1 backends passed
+OK
+elapsed=57.69

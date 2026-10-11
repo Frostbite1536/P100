@@ -40,10 +40,12 @@ at 32K: the FP16 sum stalls at 8,192 once each term is below half an ulp). With 
 accumulator in FP32 in reference mode only, they pass 16/16, and full FLASH_ATTN_EXT passes 4009/4009 for
 upstream and for 0001+0002.
 
-Not verified, read from the code: the same FP16 accumulation runs in **normal CPU inference** for F16 V when the
-tiled path is not taken (fewer than 64 query rows) — including the decode split-KV path, whose per-thread chunks
-are `nek1/nth` keys (4,096 at 32K with 8 threads). That would affect CPU-backend users at long context with an
-F16 cache. Not measured on real models; reporting upstream is the owner's call (llama.cpp's contribution rules).
+**Measured (CPU only, `bench/results/cpu-fa-fp16-2026-10-10/`):** the same FP16 accumulation runs in **normal
+CPU inference** for F16 V when the tiled path is not taken (fewer than 64 query rows), including the decode
+split-KV path (per-thread chunks of `nek1/nth` keys). `test-backend-ops -b CPU` on the 16 biased-V cases: 4/16 pass
+(only nb 512, the tiled path); NMSE at 32K keys 0.43 (nb 1) and 11.6–12.1 (nb 4/16). Disabling only the FP16
+branch: 16/16. Why nb 4/16 exceed NMSE 1 is not explained. Stress inputs; real-model impact not measured;
+reporting upstream is the owner's call (llama.cpp's contribution rules).
 
 ## 3. Decode mat-vec without dp4a (H1)
 

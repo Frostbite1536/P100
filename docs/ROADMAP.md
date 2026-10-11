@@ -29,8 +29,9 @@ every change small enough to upstream or carry as a patch. Background and hypoth
 - P-10 `test_p2p` setup race fixed. ✅ (p10)
 - P-11 Day-one A/B kit: variants `upstream conv8 flush mmvh`, MUL_MAT perf n = 1..8, tg128, perplexity. ✅ (p11)
 
-Still open before hardware: mmvh for q5_K/q6_K (the other half of Q4_K_M files); upstream-quality write-ups are
-the owner's (llama.cpp forbids AI-written PR text).
+- P-12 Patch 0006: mmvh for q5_K/q6_K (q6_K is ~27% of Llama-3.1-8B Q4_K_M decode bytes). (p12, in progress)
+
+Still open before hardware: upstream-quality write-ups are the owner's (llama.cpp forbids AI-written PR text).
 
 **Excludes**: any performance claim.
 
