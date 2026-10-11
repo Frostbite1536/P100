@@ -30,6 +30,7 @@ every change small enough to upstream or carry as a patch. Background and hypoth
 - P-11 Day-one A/B kit: variants `upstream conv8 flush mmvh`, MUL_MAT perf n = 1..8, tg128, perplexity. ✅ (p11)
 
 - P-12 Patch 0006: mmvh for q5_K/q6_K (q6_K is ~27% of Llama-3.1-8B Q4_K_M decode bytes). ✅ (p12)
+- Lessons from volta-fa P-9 (V100 small-batch matmul, 2026-10-11): `docs/research/volta-fa-p9-lessons-2026-10-11.md`. Suggested, not yet ticketed: extend `mmperf` to n = 1..16 (at the pin, sm_60 sends dense quantised MUL_MAT at ≥ 9 tokens to dequantise + cuBLAS, ~8× the bytes of one weight read); FP32-reference KL divergence in the kit; volta-fa's activation-range tests as a local-only patch.
 
 Still open before hardware: upstream-quality write-ups are the owner's (llama.cpp forbids AI-written PR text).
 
