@@ -100,3 +100,17 @@ if(Python3_Interpreter_FOUND)
     set_tests_properties(vecdot_sass PROPERTIES TIMEOUT 180)
   endif()
 endif()
+
+add_executable(qmv_numerics qmv_numerics.cpp)
+target_link_libraries(qmv_numerics PRIVATE p100_ref)
+add_test(NAME qmv_numerics COMMAND qmv_numerics)
+if(Python3_Interpreter_FOUND AND _sm60_toolchain_result EQUAL 0)
+  add_test(NAME h2_mmv_sm60_report
+    COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/bin/sm60-report.py
+            ${PROJECT_SOURCE_DIR}/bench/micro/h2_mmv.cu)
+endif()
+if(P100_HAVE_CUDA)
+  add_executable(h2_mmv_gpu h2_mmv_gpu.cu)
+  target_link_libraries(h2_mmv_gpu PRIVATE p100_ref CUDA::cudart)
+  add_test(NAME h2_mmv_gpu COMMAND flock /tmp/p100-gpu.lock $<TARGET_FILE:h2_mmv_gpu>)
+endif()

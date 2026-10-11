@@ -67,6 +67,7 @@ endif()
 
 if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/src/reference/CMakeLists.txt)
   add_subdirectory(src/reference)
+  target_sources(p100_ref PRIVATE src/reference/qmv_model.cpp)
 endif()
 if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/tests/CMakeLists.txt)
   add_subdirectory(tests)
