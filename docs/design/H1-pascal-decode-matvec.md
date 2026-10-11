@@ -1,6 +1,6 @@
 # H1: decode mat-vec without dp4a (half2 path for sm_60)
 
-Status: pre-hardware. Prototype `p6`; llama.cpp patch `third_party/patches/0005` (`p9`), in the day-one A/B (`p11`).
+Status: pre-hardware. Prototype `p6`; llama.cpp patches `0005` (`p9`, q4_0/q8_0/q4_K) and `0006` (`p12`, q5_K/q6_K), in the day-one A/B (`p11`).
 Nothing here ran on a P100.
 
 ## Problem
@@ -41,6 +41,13 @@ instructions per weight per column (`MOV`/`DEPBAR` counted as ALU in both):
 | q8_0 | 3.9 | 2.78 | 1.89 | 1.35 | 1.11 |
 | q4_K | 5.5 | 2.78 | 1.83 | 1.40 | 1.19 |
 
+q5_K and q6_K (patch 0006, `p12`), all instructions in the compiled sm_60 inner loop of `mmvh` per 32 weights
+(loads and control included, so conservative against the ALU-only upstream column): q5_K 141 / 179 / 249 / 399
+at B = 1 / 2 / 4 / 8, q6_K 138 / 179 / 258 / 419; upstream `vec_dot_*_q8_1` per column: q5_K ~198 ALU, q6_K ~245
+ALU (`vecdot-sass-2026-10-10.csv`, per 256 divided by 8), repeated per column. Registers: up to 166 (q5_K) and
+198 (q6_K, B = 7) per thread, 0 spills; at one warp per row that limits resident warps per SM at large B, so
+occupancy versus bandwidth is a P100 tuning question.
+
 Model predictions for Llama-3.1-8B on a P100 PCIe 16 GB (datasheet peaks, uncalibrated; tokens/s per batch step):
 
 | type | batch | llama.cpp | h2 | h2 if every instruction (loads too) cost an ALU slot |
@@ -59,6 +66,9 @@ relative to the block maximum. Chain 8 is slightly more accurate than 16; both a
 
 Correctness of layout and indexing: `bin/maxwell-check.sh` on the M2200 (FP32 emulation of the half2 ops),
 29,543 cases, 0 failures, worst 4e-8 of ‖w‖‖x‖. FP16 arithmetic on a GPU: not run (needs sm_53+).
+Patch 0006 on the M2200 (forced, FP32 emulation): q4_0–q6_K n ≤ 8 MUL_MAT 375/375; independent review of the
+FP16-only branch (bit constructions, lop3 immediates, bias constants, chain bounds, a numpy bit-exact model over
+300 random blocks per type) found no defects.
 
 ## Risks and open points
 

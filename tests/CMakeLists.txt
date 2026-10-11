@@ -122,6 +122,7 @@ if(P100_HAVE_CUDA)
   add_executable(h2_mmv_gpu h2_mmv_gpu.cu)
   target_link_libraries(h2_mmv_gpu PRIVATE p100_ref CUDA::cudart)
   add_test(NAME h2_mmv_gpu COMMAND flock /tmp/p100-gpu.lock $<TARGET_FILE:h2_mmv_gpu>)
+  set_tests_properties(h2_mmv_gpu PROPERTIES SKIP_RETURN_CODE 77)
 endif()
 if(Python3_Interpreter_FOUND)
   add_test(NAME fa_split_table

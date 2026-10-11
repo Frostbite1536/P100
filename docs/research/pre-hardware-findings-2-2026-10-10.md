@@ -66,6 +66,11 @@ Design: `docs/design/H1-pascal-decode-matvec.md`. Prototype (p6) → llama.cpp p
   slower than the bandwidth bound (fitted bandwidth efficiency 0.62 / 0.63). Rows with large round-to-round
   spread (mostly n = 5, 8) disagree between runs and are not used.
 
+- **q5_K/q6_K (patch 0006, p12)**: q6_K is ~27% of Llama-3.1-8B Q4_K_M decode bytes (attn_v/ffn_down in 16 of 32
+  layers, output.weight). Inner loop per 32 weights, all instructions: q5_K 141 (B 1) to 399 (B 8), q6_K 138 to
+  419, vs upstream ~198 / ~245 ALU per column. sm_60 0 spills; q6_K up to 198 registers. Maxwell forced: 375/375
+  targeted, full MUL_MAT 1161/0 to the pre-existing abort. Opus review of the FP16-only branch: no defects.
+
 Prediction for the P100 (uncalibrated; Llama-3.1-8B; tokens/s per batch step): q4_K batch 1 113 → 173
 (bandwidth-bound), batch 4 113 → 443. If the P100's bandwidth efficiency is as low as the Maxwell's (0.6), the
 batch-1 gain shrinks accordingly; Phase 0 measures it.

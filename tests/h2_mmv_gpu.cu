@@ -73,6 +73,14 @@ int main() {
     cudaDeviceProp prop{}; CUDA(cudaGetDeviceProperties(&prop,0));
     const int arch=prop.major*10+prop.minor;
     if(arch!=52 && arch!=60) { std::fprintf(stderr,"test supports sm_52 or sm_60, got sm_%d\n",arch); return 1; }
+    // The default build targets sm_60 only (INV-ARCH-001); sm_52 code exists only in bin/maxwell-check.sh builds.
+    cudaFuncAttributes attributes{};
+    const cudaError_t image=cudaFuncGetAttributes(&attributes,h16_prepass);
+    if(image==cudaErrorNoKernelImageForDevice || image==cudaErrorInvalidDeviceFunction) {
+        (void)cudaGetLastError();
+        std::printf("SKIP: no sm_%d code in this binary (bin/maxwell-check.sh builds sm_52)\n",arch);
+        return 77;
+    }
     std::printf("sm_%d: %s; seed=600602; %s\n",arch,prop.name,
                 arch==52?"FP32 emulation checks indexing/layout only":"FP16 arithmetic vs CPU half2 model");
     std::fflush(stdout);
