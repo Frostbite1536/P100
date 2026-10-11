@@ -1,0 +1,169 @@
+From 4fa26c37ee43fe247ae95dd40781a14ba4c0c1bf Mon Sep 17 00:00:00 2001
+From: P100 patch author <p100-patches@localhost>
+Date: Sat, 10 Oct 2026 20:09:43 -0500
+Subject: [PATCH] CUDA: flush FP16 FA tile VKQ to FP32 per KV tile
+
+FP16 accumulation over thousands of keys loses small P*V terms. The p5 CPU model measured 0.1-2.6% max relative error for decode and 2.8%/18%/33% for biased-V prefill at 4K/16K/32K keys; with 256 keys per accumulator the error was at most 0.24%. Keep per-tile half2 updates and carry rescale and warp combination in FP32.
+
+Assisted-by: Codex
+---
+ ggml/src/ggml-cuda/fattn-tile.cuh | 57 +++++++++++++++++++++++--------
+ 1 file changed, 42 insertions(+), 15 deletions(-)
+
+diff --git a/ggml/src/ggml-cuda/fattn-tile.cuh b/ggml/src/ggml-cuda/fattn-tile.cuh
+index b5ea915e1..d2ba10a56 100644
+--- a/ggml/src/ggml-cuda/fattn-tile.cuh
++++ b/ggml/src/ggml-cuda/fattn-tile.cuh
+@@ -573,6 +573,9 @@ static __device__ __forceinline__ void flash_attn_tile_iter(
+         float * const KQ_max,
+         float * const KQ_sum,
+         T_acc * const VKQ,
++#ifdef FAST_FP16_AVAILABLE
++        float2 * const VKQ_f32,
++#endif // FAST_FP16_AVAILABLE
+         const int k_VKQ_0,
+         const int k_VKQ_max,
+         const int col_Q_0) {
+@@ -686,10 +689,10 @@ static __device__ __forceinline__ void flash_attn_tile_iter(
+             KQ_sum[jc] = KQ_sum[jc]*KQ_max_scale + KQ_sum_add;
+ 
+ #ifdef FAST_FP16_AVAILABLE
+-            const half2 KQ_max_scale_h2 = make_half2(KQ_max_scale, KQ_max_scale);
+ #pragma unroll
+             for (int i0 = 0; i0 < DVp/2; i0 += warp_size) {
+-                VKQ[jc*((DVp/2)/warp_size) + i0/warp_size] *= KQ_max_scale_h2;
++                VKQ_f32[jc*((DVp/2)/warp_size) + i0/warp_size].x *= KQ_max_scale;
++                VKQ_f32[jc*((DVp/2)/warp_size) + i0/warp_size].y *= KQ_max_scale;
+             }
+ #else
+ #pragma unroll
+@@ -786,6 +789,15 @@ static __device__ __forceinline__ void flash_attn_tile_iter(
+ 
+         __syncthreads();
+     }
++#ifdef FAST_FP16_AVAILABLE
++#pragma unroll
++    for (int i = 0; i < cpw * ((DVp/2)/warp_size); ++i) {
++        const float2 tile = __half22float2(VKQ[i]);
++        VKQ_f32[i].x += tile.x;
++        VKQ_f32[i].y += tile.y;
++        VKQ[i] = make_half2(0.0f, 0.0f);
++    }
++#endif // FAST_FP16_AVAILABLE
+ }
+ 
+ template<int DKQ, int DV, int ncols1, int ncols2, bool use_logit_softcap> // D == head size
+@@ -886,6 +898,7 @@ static __global__ void flash_attn_tile(
+     __shared__ half2 KV_tmp[nbatch_fa * (nbatch_K/2 + cpy_ne) + DVp-DV];
+     __shared__ half  KQ[ncols * nbatch_fa];
+     __align__(16) half2 VKQ[cpw * ((DVp/2)/warp_size)] = {{0.0f, 0.0f}};
++    __align__(16) float2 VKQ_f32[cpw * ((DVp/2)/warp_size)] = {{0.0f, 0.0f}};
+ #else
+     __shared__ float Q_tmp[ncols * DKQ];
+     __shared__ float KV_tmp[nbatch_fa * (nbatch_K + cpy_ne) + DVp-DV];
+@@ -959,14 +972,22 @@ static __global__ void flash_attn_tile(
+             constexpr bool oob_check = false;
+             flash_attn_tile_iter<warp_size, nwarps, ncols1, ncols2, DKQ, DV, nbatch_fa, nbatch_K, use_logit_softcap, oob_check>
+                 (Q_tmp, K_h2, V_h2, maskh, ne01, logit_softcap, slope, KQ, KV_tmp,
+-                stride_K2, stride_V2, stride_mask, KQ_max, KQ_sum, VKQ, k_VKQ_0, k_VKQ_max, col_Q_0);
++                stride_K2, stride_V2, stride_mask, KQ_max, KQ_sum, VKQ,
++#ifdef FAST_FP16_AVAILABLE
++                VKQ_f32,
++#endif // FAST_FP16_AVAILABLE
++                k_VKQ_0, k_VKQ_max, col_Q_0);
+             k_VKQ_0 += gridDim.y*nbatch_fa;
+         }
+         if (k_VKQ_0 < k_VKQ_max) {
+             constexpr bool oob_check = true;
+             flash_attn_tile_iter<warp_size, nwarps, ncols1, ncols2, DKQ, DV, nbatch_fa, nbatch_K, use_logit_softcap, oob_check>
+                 (Q_tmp, K_h2, V_h2, maskh, ne01, logit_softcap, slope, KQ, KV_tmp,
+-                stride_K2, stride_V2, stride_mask, KQ_max, KQ_sum, VKQ, k_VKQ_0, k_VKQ_max, col_Q_0);
++                stride_K2, stride_V2, stride_mask, KQ_max, KQ_sum, VKQ,
++#ifdef FAST_FP16_AVAILABLE
++                VKQ_f32,
++#endif // FAST_FP16_AVAILABLE
++                k_VKQ_0, k_VKQ_max, col_Q_0);
+         }
+     } else {
+         // Branch without out-of-bounds checks.
+@@ -974,7 +995,11 @@ static __global__ void flash_attn_tile(
+             constexpr bool oob_check = false;
+             flash_attn_tile_iter<warp_size, nwarps, ncols1, ncols2, DKQ, DV, nbatch_fa, nbatch_K, use_logit_softcap, oob_check>
+                 (Q_tmp, K_h2, V_h2, maskh, ne01, logit_softcap, slope, KQ, KV_tmp,
+-                stride_K2, stride_V2, stride_mask, KQ_max, KQ_sum, VKQ, k_VKQ_0, k_VKQ_max, col_Q_0);
++                stride_K2, stride_V2, stride_mask, KQ_max, KQ_sum, VKQ,
++#ifdef FAST_FP16_AVAILABLE
++                VKQ_f32,
++#endif // FAST_FP16_AVAILABLE
++                k_VKQ_0, k_VKQ_max, col_Q_0);
+         }
+     }
+ 
+@@ -988,7 +1013,8 @@ static __global__ void flash_attn_tile(
+         static_assert(nbatch_fa*nbatch_K >= nwarps*DVp, "KV_tmp too small");
+ 
+ #ifdef FAST_FP16_AVAILABLE
+-        half2 * VKQ_combine    = (half2 *) KV_tmp;
++        static_assert(nbatch_fa * (nbatch_K/2 + cpy_ne) + DVp-DV >= nwarps*DVp, "KV_tmp too small for FP32 combine");
++        float * VKQ_combine    = (float *) KV_tmp;
+ #else
+         float * VKQ_combine    = (float *) KV_tmp;
+ #endif // FAST_FP16_AVAILABLE
+@@ -996,10 +1022,10 @@ static __global__ void flash_attn_tile(
+ 
+         if (threadIdx.y % np != 0) {
+ #ifdef FAST_FP16_AVAILABLE
+-            constexpr int cpy_ne_D = cpy_ne < (DVp/2)/warp_size ? cpy_ne : (DVp/2)/warp_size;
++            constexpr int cpy_ne_D = cpy_ne/2 < (DVp/2)/warp_size ? cpy_ne/2 : (DVp/2)/warp_size;
+ #pragma unroll
+             for (int i0 = 0; i0 < DVp/2; i0 += warp_size*cpy_ne_D) {
+-                ggml_cuda_memcpy_1<cpy_ne_D*4>(&VKQ_combine[threadIdx.y*(DVp/2) + i0 + threadIdx.x*cpy_ne_D], &VKQ[i0/warp_size]);
++                ggml_cuda_memcpy_1<cpy_ne_D*8>(&VKQ_combine[threadIdx.y*DVp + 2*i0 + threadIdx.x*(2*cpy_ne_D)], &VKQ_f32[i0/warp_size]);
+             }
+ #else
+             constexpr int cpy_ne_D = cpy_ne < DVp/warp_size ? cpy_ne : DVp/warp_size;
+@@ -1022,14 +1048,15 @@ static __global__ void flash_attn_tile(
+ #pragma unroll
+         for (int ip = 1; ip < np; ++ip) {
+ #ifdef FAST_FP16_AVAILABLE
+-            constexpr int cpy_ne_D = cpy_ne < (DVp/2)/warp_size ? cpy_ne : (DVp/2)/warp_size;
++            constexpr int cpy_ne_D = cpy_ne/2 < (DVp/2)/warp_size ? cpy_ne/2 : (DVp/2)/warp_size;
+ #pragma unroll
+             for (int i0 = 0; i0 < DVp/2; i0 += warp_size*cpy_ne_D) {
+-                __align__(16) half2 tmp[cpy_ne_D];
+-                ggml_cuda_memcpy_1<cpy_ne_D*4>(tmp, &VKQ_combine[(threadIdx.y + ip)*(DVp/2) + i0 + threadIdx.x*cpy_ne_D]);
++                __align__(16) float2 tmp[cpy_ne_D];
++                ggml_cuda_memcpy_1<cpy_ne_D*8>(tmp, &VKQ_combine[(threadIdx.y + ip)*DVp + 2*i0 + threadIdx.x*(2*cpy_ne_D)]);
+ #pragma unroll
+                 for (int i1 = 0; i1 < cpy_ne_D; ++i1) {
+-                    VKQ[i0/warp_size + i1] += tmp[i1];
++                    VKQ_f32[i0/warp_size + i1].x += tmp[i1].x;
++                    VKQ_f32[i0/warp_size + i1].y += tmp[i1].y;
+                 }
+             }
+ #else
+@@ -1064,10 +1091,10 @@ static __global__ void flash_attn_tile(
+             KQ_sum[jc0] = KQ_sum[jc0]*KQ_max_scale + val;
+ 
+ #ifdef FAST_FP16_AVAILABLE
+-            const half2 KQ_max_scale_h2 = make_half2(KQ_max_scale, KQ_max_scale);
+ #pragma unroll
+             for (int i0 = 0; i0 < DVp/2; i0 += warp_size) {
+-                VKQ[jc0*((DVp/2)/warp_size) + i0/warp_size] *= KQ_max_scale_h2;
++                VKQ_f32[jc0*((DVp/2)/warp_size) + i0/warp_size].x *= KQ_max_scale;
++                VKQ_f32[jc0*((DVp/2)/warp_size) + i0/warp_size].y *= KQ_max_scale;
+             }
+ #else
+ #pragma unroll
+@@ -1102,7 +1129,7 @@ static __global__ void flash_attn_tile(
+             __align__(16) float2 tmp[cpy_ne_D];
+ #pragma unroll
+             for (int i1 = 0; i1 < cpy_ne_D; ++i1) {
+-                tmp[i1] = __half22float2(VKQ[jc0*((DVp/2)/warp_size) + i0/warp_size + i1]);
++                tmp[i1] = VKQ_f32[jc0*((DVp/2)/warp_size) + i0/warp_size + i1];
+                 tmp[i1].x *= scale;
+                 tmp[i1].y *= scale;
+             }
+-- 
+2.43.0
+

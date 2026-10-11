@@ -152,46 +152,49 @@ int main(int argc, char** argv) {
                   << "TILE rows model FP16 O; VEC rows are requested L60 counterfactuals (real NVIDIA VEC O is FP32); other/MMA rows skipped\n"
                   << "keys_per_fp16_accumulator=0 for VEC (inapplicable); max_rel=max_abs/max|O_ref|\n";
         consistency();
-        std::cout << "cc,d,kernel,bc,np,parallel_blocks,seq_kv,keys_per_fp16_accumulator,dist,split_max_rel,split_lse_abs,split_outside,unsplit_max_rel,unsplit_lse_abs,unsplit_outside,nonfinite\n"
+        std::cout << "cc,d,kernel,bc,np,parallel_blocks,seq_kv,keys_per_fp16_accumulator,dist,split_max_rel,split_lse_abs,split_outside,unsplit_max_rel,unsplit_lse_abs,unsplit_outside,flush_max_rel,flush_lse_abs,flush_outside,nonfinite\n"
                   << std::scientific << std::setprecision(6);
         // Reuse metrics only for identical numerical configurations. No KV
         // quantisation is simulated: the ticket requests the same FP16 L60 inputs.
         using Shape = std::tuple<int, int, int>;
-        using Run = std::tuple<int, int, int, int, int, int>;
+        using Run = std::tuple<int, int, int, int, int, int, bool>;
         std::map<Shape, Inputs> input_cache;
         std::map<Run, Metrics> run_cache;
-        Metrics split_summary, unsplit_summary, tile_split, tile_unsplit;
+        Metrics split_summary, unsplit_summary, flush_summary, tile_split, tile_unsplit, tile_flush;
         for (const auto& r : rows) for (int distribution : {0, 3}) {
             const Shape shape{r.d, r.nk, distribution};
             auto it = input_cache.find(shape);
             if (it == input_cache.end()) it = input_cache.emplace(shape, Inputs(r.d, r.nk, distribution)).first;
             const auto& inputs = it->second;
-            auto run = [&](int blocks, int np) {
-                const Run key{r.d, r.nk, distribution, r.bc, blocks, np};
+            auto run = [&](int blocks, int np, bool flush = false) {
+                const Run key{r.d, r.nk, distribution, r.bc, blocks, np, flush};
                 auto found = run_cache.find(key);
                 if (found == run_cache.end()) {
                     auto cfg = l60(r.bc); cfg.kv_parallel_blocks = blocks; cfg.o_accum_np = np;
+                    cfg.o_accum_fp16_tile_flush = flush;
                     found = run_cache.emplace(key, inputs.run(cfg)).first;
                 }
                 return found->second;
             };
-            const auto split = run(r.blocks, r.np), unsplit = run(1, 1);
-            add_summary(split_summary, split); add_summary(unsplit_summary, unsplit);
-            if (r.kernel == "TILE") { add_summary(tile_split, split); add_summary(tile_unsplit, unsplit); }
+            const auto split = run(r.blocks, r.np), unsplit = run(1, 1), flush = run(r.blocks, r.np, true);
+            add_summary(split_summary, split); add_summary(unsplit_summary, unsplit); add_summary(flush_summary, flush);
+            if (r.kernel == "TILE") { add_summary(tile_split, split); add_summary(tile_unsplit, unsplit); add_summary(tile_flush, flush); }
             std::cout << r.cc << ',' << r.d << ',' << r.kernel << ',' << r.bc << ',' << r.np << ','
                       << r.blocks << ',' << r.nk << ',' << r.keys << ',' << (distribution == 0 ? "normal" : "vbias")
                       << ',' << split.max_rel << ',' << split.lse_abs << ',' << split.outside
                       << ',' << unsplit.max_rel << ',' << unsplit.lse_abs << ',' << unsplit.outside
-                      << ',' << split.nonfinite + unsplit.nonfinite << '\n';
+                      << ',' << flush.max_rel << ',' << flush.lse_abs << ',' << flush.outside
+                      << ',' << split.nonfinite + unsplit.nonfinite + flush.nonfinite << '\n';
         }
         std::cout << "summary cfg worst_max_rel worst_lse_abs out_outside_tolerance nonfinite\n";
         for (auto item : {std::make_pair("split", split_summary), std::make_pair("unsplit", unsplit_summary),
-                          std::make_pair("TILE_split", tile_split), std::make_pair("TILE_unsplit", tile_unsplit)})
+                          std::make_pair("flush", flush_summary), std::make_pair("TILE_split", tile_split),
+                          std::make_pair("TILE_unsplit", tile_unsplit), std::make_pair("TILE_flush", tile_flush)})
             std::cout << item.first << ' ' << item.second.max_rel << ' ' << item.second.lse_abs << ' '
                       << item.second.outside << ' ' << item.second.nonfinite << '\n';
         std::cout << "elapsed_seconds=" << std::chrono::duration<double>(std::chrono::steady_clock::now()-start).count()
                   << " mode=" << (long_run ? "long" : "short") << " distinct_rows=" << rows.size() << '\n';
-        return split_summary.nonfinite + unsplit_summary.nonfinite == 0 ? 0 : 1;
+        return split_summary.nonfinite + unsplit_summary.nonfinite + flush_summary.nonfinite == 0 ? 0 : 1;
     } catch (const std::exception& e) {
         std::cerr << e.what() << '\n'; return 1;
     }

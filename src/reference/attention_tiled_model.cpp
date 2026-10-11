@@ -60,6 +60,7 @@ void attention_tiled_model(const AttnParams& p, const TiledModelConfig& cfg, con
                          static_cast<int>(cfg.qk_half2_chain > 0);
     if (qk_modes > 1) throw std::invalid_argument("QK accumulation modes are mutually exclusive");
     if (cfg.qk_q_prescale <= 0.0f) throw std::invalid_argument("Q prescale must be positive");
+    const bool tile_flush = cfg.o_accum_fp16 && cfg.o_accum_fp16_tile_flush;
     const float neg_inf = -std::numeric_limits<float>::infinity();
     const float scale = p.effective_scale();
     const int block_rows = std::min(cfg.br, p.seq_q);
@@ -146,12 +147,14 @@ void attention_tiled_model(const AttnParams& p, const TiledModelConfig& cfg, con
                         const float alpha = m[state] == neg_inf ? 0.0f : std::exp(m[state] - m_new);
                         float tile_sum = 0.0f;
                         float* row_acc = acc.data() + state * row_stride;
-                        if (cfg.o_accum_fp16) {
+                        if (cfg.o_accum_fp16 && !tile_flush) {
                             const float half_alpha = round_to_fp16(alpha);
                             for (std::size_t d = 0; d < row_stride; ++d)
                                 row_acc[d] = round_to_fp16(static_cast<double>(row_acc[d]) * half_alpha);
                         } else {
                             std::fill(tile_acc.begin(), tile_acc.end(), 0.0f);
+                            if (tile_flush)
+                                for (std::size_t d = 0; d < row_stride; ++d) row_acc[d] *= alpha;
                         }
                         for (int c = 0; c < nc; ++c) {
                             float weight = std::exp(logits[c] - m_new);
@@ -161,13 +164,16 @@ void attention_tiled_model(const AttnParams& p, const TiledModelConfig& cfg, con
                             const std::size_t lane = static_cast<std::size_t>(c % cfg.o_accum_np) * p.d_v;
                             const float* value = v + (kv_base + jb + c) * p.d_v;
                             if (cfg.o_accum_fp16) {
+                                float* update_acc = tile_flush ? tile_acc.data() : row_acc;
                                 for (int d = 0; d < p.d_v; ++d)
-                                    row_acc[lane + d] = round_to_fp16(static_cast<double>(weight) * value[d] + row_acc[lane + d]);
+                                    update_acc[lane + d] = round_to_fp16(static_cast<double>(weight) * value[d] + update_acc[lane + d]);
                             } else {
                                 for (int d = 0; d < p.d_v; ++d) tile_acc[lane + d] += weight * value[d];
                             }
                         }
-                        if (!cfg.o_accum_fp16)
+                        if (tile_flush)
+                            for (std::size_t d = 0; d < row_stride; ++d) row_acc[d] += tile_acc[d];
+                        else if (!cfg.o_accum_fp16)
                             for (std::size_t d = 0; d < row_stride; ++d) row_acc[d] = row_acc[d] * alpha + tile_acc[d];
                         l[state] = l[state] * alpha + tile_sum;
                         m[state] = m_new;
@@ -186,7 +192,7 @@ void attention_tiled_model(const AttnParams& p, const TiledModelConfig& cfg, con
                         for (int lane = 1; lane < cfg.o_accum_np; ++lane) {
                             for (int d = 0; d < p.d_v; ++d) {
                                 const float sum = partial[d] + partial[static_cast<std::size_t>(lane) * p.d_v + d];
-                                partial[d] = cfg.o_accum_fp16 ? round_to_fp16(sum) : sum;
+                                partial[d] = cfg.o_accum_fp16 && !tile_flush ? round_to_fp16(sum) : sum;
                             }
                         }
                     }
