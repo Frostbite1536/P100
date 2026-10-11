@@ -20,7 +20,10 @@ assert set(opts) <= {'-b', '-o', '-p', '--output'}
 with open(os.environ['SHIM_CALL_LOG'], 'a') as f:
     f.write(json.dumps(dict(tool='tbo', mode=mode, opts=opts)) + '\n')
 if mode != 'perf':
-    assert '-p' not in opts, 'correctness must run the full suite'
+    if '-p' in opts:
+        assert mode == 'test' and op == 'FLASH_ATTN_EXT' and opts['-p'] == 'v_bias'
+        print(f'FAKE biased V v_bias=2.000000 {opts["-b"]}: OK; 16/16 passed (no hardware tested)')
+        sys.exit(0)
     print(f'FAKE {op} {opts["-b"]}: OK; 1/1 passed (no hardware tested)')
     sys.exit(0)
 assert opts['--output'] == 'sql'

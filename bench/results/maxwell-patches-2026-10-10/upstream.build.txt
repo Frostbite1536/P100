@@ -1,0 +1,520 @@
+[1/287] Building CXX object ggml/src/CMakeFiles/ggml-base.dir/ggml.cpp.o
+[2/287] Building C object ggml/src/CMakeFiles/ggml-base.dir/ggml-alloc.c.o
+[3/287] Building CXX object ggml/src/CMakeFiles/ggml-base.dir/ggml-backend.cpp.o
+[4/287] Building C object ggml/src/CMakeFiles/ggml-base.dir/ggml.c.o
+[5/287] Building CXX object ggml/src/CMakeFiles/ggml-base.dir/ggml-opt.cpp.o
+[6/287] Building CXX object ggml/src/CMakeFiles/ggml-base.dir/ggml-threading.cpp.o
+[7/287] Building CXX object ggml/src/CMakeFiles/ggml-base.dir/ggml-backend-meta.cpp.o
+[8/287] Building C object ggml/src/CMakeFiles/ggml-base.dir/ggml-quants.c.o
+[9/287] Building CXX object ggml/src/CMakeFiles/ggml-base.dir/gguf.cpp.o
+[10/287] Linking CXX shared library bin/libggml-base.so.0.26.0
+[11/287] Creating library symlink bin/libggml-base.so.0 bin/libggml-base.so
+[12/287] Building C object ggml/src/CMakeFiles/ggml-cpu.dir/ggml-cpu/ggml-cpu.c.o
+[13/287] Building CXX object ggml/src/CMakeFiles/ggml-cpu.dir/ggml-cpu/ggml-cpu.cpp.o
+[14/287] Building CXX object ggml/src/CMakeFiles/ggml-cpu.dir/ggml-cpu/hbm.cpp.o
+[15/287] Building C object ggml/src/CMakeFiles/ggml-cpu.dir/ggml-cpu/quants.c.o
+[16/287] Building CXX object ggml/src/CMakeFiles/ggml-cpu.dir/ggml-cpu/traits.cpp.o
+[17/287] Building CXX object ggml/src/CMakeFiles/ggml-cpu.dir/ggml-cpu/amx/amx.cpp.o
+[18/287] Building CXX object ggml/src/CMakeFiles/ggml-cpu.dir/ggml-cpu/amx/mmq.cpp.o
+[19/287] Building CXX object ggml/src/CMakeFiles/ggml-cpu.dir/ggml-cpu/repack.cpp.o
+[20/287] Building CXX object ggml/src/CMakeFiles/ggml-cpu.dir/ggml-cpu/tiled/tiled-kernel.cpp.o
+[21/287] Building CXX object ggml/src/CMakeFiles/ggml-cpu.dir/ggml-cpu/binary-ops.cpp.o
+[22/287] Building CXX object ggml/src/CMakeFiles/ggml-cpu.dir/ggml-cpu/tiled/tiled.cpp.o
+[23/287] Building CXX object ggml/src/CMakeFiles/ggml-cpu.dir/ggml-cpu/vec.cpp.o
+[24/287] Building CXX object ggml/src/CMakeFiles/ggml-cpu.dir/ggml-cpu/unary-ops.cpp.o
+[25/287] Building CXX object ggml/src/CMakeFiles/ggml-cpu.dir/ggml-cpu/llamafile/sgemm.cpp.o
+[26/287] Building C object ggml/src/CMakeFiles/ggml-cpu.dir/ggml-cpu/arch/x86/quants.c.o
+[27/287] Building CXX object ggml/src/CMakeFiles/ggml-cpu.dir/ggml-cpu/ops.cpp.o
+[28/287] Building CXX object ggml/src/CMakeFiles/ggml-cpu.dir/ggml-cpu/arch/x86/repack.cpp.o
+[29/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/add-id.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[30/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/acc.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[31/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/arange.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[32/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/allreduce.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[33/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/argmax.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[34/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/binbcast.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[35/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/clamp.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[36/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/argsort.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[37/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/col2im-1d.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[38/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/conv-transpose-1d.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[39/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/concat.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[40/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/conv2d-dw.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[41/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/conv2d-transpose.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[42/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/conv2d.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[43/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/convert.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[44/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/conv3d.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[45/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/count-equal.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[46/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/cpy.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[47/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/cross-entropy-loss.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[48/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/diag.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[49/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/diagmask.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[50/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/cumsum.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[51/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/dsv4-hc.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[52/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/fattn-tile.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[53/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/fill.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[54/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/fattn.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[55/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/fwht.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[56/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/gated_delta_net.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[57/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/getrows.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[58/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/ggml-cuda.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[59/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/gla.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[60/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/im2col.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[61/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/mean.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[62/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/lightning-indexer.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[63/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/mmf.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[64/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/mmid.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[65/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/mmq.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[66/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/mmvf.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[67/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/moe-weighted-reduction.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[68/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/norm.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[69/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/opt-step-adamw.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[70/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/opt-step-sgd.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[71/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/out-prod.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[72/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/pad.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[73/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/pad_reflect_1d.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[74/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/pool1d.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[75/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/pool2d.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[76/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/quantize.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[77/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/roll.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[78/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/rope.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[79/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/scale.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[80/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/set-rows.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[81/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/mmvq.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[82/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/set.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[83/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/snake.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[84/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/softcap.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[85/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/softmax.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[86/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/solve_tri.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[87/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/ssm-conv.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[88/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/ssm-scan.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[89/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/sum.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[90/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/sumrows.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[91/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/top-k.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[92/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/topk-moe.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[93/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/tri.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[94/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/tsembd.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[95/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/upscale.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[96/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/unary.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[97/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/wkv.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[98/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/fattn-tile-instance-dkq112-dv112.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[99/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/fattn-tile-instance-dkq192-dv128.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[100/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/fattn-tile-instance-dkq128-dv128.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[101/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/fattn-tile-instance-dkq320-dv256.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[102/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/fattn-tile-instance-dkq40-dv40.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[103/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/fattn-tile-instance-dkq256-dv256.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[104/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/fattn-tile-instance-dkq512-dv512.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[105/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/fattn-tile-instance-dkq576-dv512.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[106/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/fattn-tile-instance-dkq64-dv64.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[107/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/fattn-tile-instance-dkq72-dv72.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[108/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/fattn-tile-instance-dkq80-dv80.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[109/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/fattn-mma-f16-instance-ncols1_1-ncols2_16.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[110/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/fattn-mma-f16-instance-ncols1_1-ncols2_32.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[111/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/fattn-mma-f16-instance-ncols1_1-ncols2_8.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[112/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/fattn-mma-f16-instance-ncols1_16-ncols2_1.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[113/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/fattn-tile-instance-dkq96-dv96.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[114/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/fattn-mma-f16-instance-ncols1_16-ncols2_2.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[115/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/fattn-mma-f16-instance-ncols1_16-ncols2_4.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[116/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/fattn-mma-f16-instance-ncols1_2-ncols2_16.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[117/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/fattn-mma-f16-instance-ncols1_2-ncols2_32.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[118/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/fattn-mma-f16-instance-ncols1_2-ncols2_4.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[119/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/fattn-mma-f16-instance-ncols1_2-ncols2_8.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[120/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/fattn-mma-f16-instance-ncols1_32-ncols2_1.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[121/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/fattn-mma-f16-instance-ncols1_32-ncols2_2.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[122/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/fattn-mma-f16-instance-ncols1_4-ncols2_16.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[123/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/fattn-mma-f16-instance-ncols1_4-ncols2_2.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[124/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/fattn-mma-f16-instance-ncols1_4-ncols2_4.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[125/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/fattn-mma-f16-instance-ncols1_4-ncols2_8.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[126/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/fattn-mma-f16-instance-ncols1_64-ncols2_1.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[127/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/fattn-mma-f16-instance-ncols1_8-ncols2_1.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[128/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/fattn-mma-f16-instance-ncols1_8-ncols2_2.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[129/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/fattn-mma-f16-instance-ncols1_8-ncols2_4.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[130/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/fattn-mma-f16-instance-ncols1_8-ncols2_8.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[131/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/mmq-instance-iq1_s.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[132/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/mmq-instance-iq2_s.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[133/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/mmq-instance-iq2_xs.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[134/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/mmq-instance-iq2_xxs.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[135/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/mmq-instance-iq3_s.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[136/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/mmq-instance-iq3_xxs.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[137/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/mmq-instance-iq4_nl.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[138/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/mmq-instance-iq4_xs.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[139/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/mmq-instance-mxfp4.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[140/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/mmq-instance-nvfp4.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[141/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/mmq-instance-q1_0.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[142/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/mmq-instance-q2_0.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[143/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/mmq-instance-q3_k.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[144/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/mmq-instance-q2_k.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[145/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/mmq-instance-q4_0.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[146/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/mmq-instance-q4_1.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[147/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/mmq-instance-q4_k.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[148/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/mmq-instance-q5_0.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[149/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/mmq-instance-q5_1.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[150/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/mmq-instance-q5_k.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[151/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/mmq-instance-q6_k.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[152/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/mmf-instance-ncols_1.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[153/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/mmq-instance-q8_0.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[154/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/mmf-instance-ncols_10.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[155/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/mmf-instance-ncols_11.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[156/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/mmf-instance-ncols_12.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[157/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/mmf-instance-ncols_13.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[158/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/mmf-instance-ncols_14.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[159/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/mmf-instance-ncols_15.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[160/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/mmf-instance-ncols_16.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[161/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/mmf-instance-ncols_2.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[162/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/mmf-instance-ncols_3.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[163/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/mmf-instance-ncols_4.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[164/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/mmf-instance-ncols_5.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[165/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/mmf-instance-ncols_6.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[166/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/mmf-instance-ncols_7.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[167/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/mmf-instance-ncols_8.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[168/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/mmf-instance-ncols_9.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[169/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/fattn-vec-instance-f16-f16.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[170/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/fattn-vec-instance-q4_0-q4_0.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[171/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/fattn-vec-instance-q8_0-q8_0.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[172/287] Linking CXX shared library bin/libggml-cpu.so.0.26.0
+[173/287] Building CXX object ggml/src/CMakeFiles/ggml.dir/ggml-backend-dl.cpp.o
+[174/287] Building CXX object ggml/src/CMakeFiles/ggml.dir/ggml-backend-reg.cpp.o
+[175/287] Creating library symlink bin/libggml-cpu.so.0 bin/libggml-cpu.so
+[176/287] Building CXX object src/CMakeFiles/llama.dir/Unity/unity_9_cxx.cxx.o
+[177/287] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/template-instances/fattn-vec-instance-bf16-bf16.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[178/287] Linking CUDA shared library bin/libggml-cuda.so.0.26.0
+[179/287] Creating library symlink bin/libggml-cuda.so.0 bin/libggml-cuda.so
+[180/287] Linking CXX shared library bin/libggml.so.0.26.0
+[181/287] Creating library symlink bin/libggml.so.0 bin/libggml.so
+[182/287] Building CXX object src/CMakeFiles/llama.dir/Unity/unity_8_cxx.cxx.o
+[183/287] Building CXX object src/CMakeFiles/llama.dir/Unity/unity_7_cxx.cxx.o
+[184/287] Building CXX object src/CMakeFiles/llama.dir/Unity/unity_6_cxx.cxx.o
+[185/287] Building CXX object src/CMakeFiles/llama.dir/Unity/unity_5_cxx.cxx.o
+[186/287] Building CXX object src/CMakeFiles/llama.dir/Unity/unity_4_cxx.cxx.o
+[187/287] Building CXX object src/CMakeFiles/llama.dir/Unity/unity_2_cxx.cxx.o
+[188/287] Building CXX object src/CMakeFiles/llama.dir/Unity/unity_3_cxx.cxx.o
+[189/287] Building CXX object src/CMakeFiles/llama.dir/Unity/unity_0_cxx.cxx.o
+[190/287] Building CXX object src/CMakeFiles/llama.dir/llama.cpp.o
+[191/287] Building CXX object src/CMakeFiles/llama.dir/Unity/unity_1_cxx.cxx.o
+[192/287] Building CXX object src/CMakeFiles/llama.dir/llama-adapter.cpp.o
+[193/287] Building CXX object src/CMakeFiles/llama.dir/llama-arch.cpp.o
+[194/287] Building CXX object src/CMakeFiles/llama.dir/llama-batch.cpp.o
+[195/287] Building CXX object src/CMakeFiles/llama.dir/llama-chat.cpp.o
+[196/287] Building CXX object src/CMakeFiles/llama.dir/llama-cparams.cpp.o
+[197/287] Building CXX object src/CMakeFiles/llama.dir/llama-context.cpp.o
+[198/287] Building CXX object src/CMakeFiles/llama.dir/llama-grammar.cpp.o
+[199/287] Building CXX object src/CMakeFiles/llama.dir/llama-hparams.cpp.o
+[200/287] Building CXX object src/CMakeFiles/llama.dir/llama-impl.cpp.o
+[201/287] Building CXX object src/CMakeFiles/llama.dir/llama-io.cpp.o
+[202/287] Building CXX object src/CMakeFiles/llama.dir/llama-graph.cpp.o
+[203/287] Building CXX object src/CMakeFiles/llama.dir/llama-kv-cache-iswa.cpp.o
+[204/287] Building CXX object src/CMakeFiles/llama.dir/llama-kv-cache-dsa.cpp.o
+[205/287] Building CXX object src/CMakeFiles/llama.dir/llama-kv-cache.cpp.o
+[206/287] Building CXX object src/CMakeFiles/llama.dir/llama-kv-cache-dsa-iswa.cpp.o
+[207/287] Building CXX object src/CMakeFiles/llama.dir/llama-kv-cache-msa.cpp.o
+[208/287] Building CXX object src/CMakeFiles/llama.dir/llama-memory.cpp.o
+[209/287] Building CXX object src/CMakeFiles/llama.dir/llama-moe-cache.cpp.o
+[210/287] Building CXX object src/CMakeFiles/llama.dir/llama-memory-hybrid.cpp.o
+[211/287] Building CXX object src/CMakeFiles/llama.dir/llama-kv-cache-dsv4.cpp.o
+[212/287] Building CXX object src/CMakeFiles/llama.dir/llama-memory-hybrid-iswa.cpp.o
+[213/287] Building CXX object src/CMakeFiles/llama.dir/llama-memory-hybrid-idx.cpp.o
+[214/287] Building CXX object src/CMakeFiles/llama.dir/llama-mmap.cpp.o
+[215/287] Building CXX object src/CMakeFiles/llama.dir/llama-memory-recurrent.cpp.o
+[216/287] Building CXX object src/CMakeFiles/llama.dir/llama-model-saver.cpp.o
+[217/287] Building CXX object src/CMakeFiles/llama.dir/llama-model-loader.cpp.o
+[218/287] Building CXX object src/CMakeFiles/llama.dir/llama-model.cpp.o
+[219/287] Building CXX object src/CMakeFiles/llama.dir/llama-quant.cpp.o
+[220/287] Building CXX object src/CMakeFiles/llama.dir/llama-sampler.cpp.o
+[221/287] Building CXX object src/CMakeFiles/llama.dir/llama-vocab.cpp.o
+[222/287] Building CXX object src/CMakeFiles/llama.dir/unicode-data.cpp.o
+[223/287] Building CXX object src/CMakeFiles/llama.dir/unicode.cpp.o
+[224/287] Linking CXX shared library bin/libllama.so.0.6.0
+[225/287] Building CXX object common/CMakeFiles/llama-common-base.dir/build-info.cpp.o
+[226/287] Creating library symlink bin/libllama.so.0 bin/libllama.so
+[227/287] Linking CXX static library common/libllama-common-base.a
+[228/287] Building CXX object common/CMakeFiles/llama-common.dir/parsers/parsers.cpp.o
+[229/287] Building CXX object common/CMakeFiles/llama-common.dir/parsers/cohere2moe.cpp.o
+[230/287] Building CXX object common/CMakeFiles/llama-common.dir/parsers/deepseek.cpp.o
+[231/287] Building CXX object vendor/cpp-httplib/CMakeFiles/cpp-httplib.dir/httplib.cpp.o
+[232/287] Linking CXX static library vendor/cpp-httplib/libcpp-httplib.a
+[233/287] Building CXX object common/CMakeFiles/llama-common.dir/parsers/functionary-v3-2.cpp.o
+[234/287] Building CXX object common/CMakeFiles/llama-common.dir/parsers/gemma4.cpp.o
+[235/287] Building CXX object common/CMakeFiles/llama-common.dir/parsers/gigachat-v3.cpp.o
+[236/287] Building CXX object common/CMakeFiles/llama-common.dir/parsers/gpt-oss.cpp.o
+[237/287] Building CXX object common/CMakeFiles/llama-common.dir/parsers/k2-horizon.cpp.o
+[238/287] Building CXX object common/CMakeFiles/llama-common.dir/parsers/kimi-k2.cpp.o
+[239/287] Building CXX object common/CMakeFiles/llama-common.dir/parsers/kimi-k3.cpp.o
+[240/287] Building CXX object common/CMakeFiles/llama-common.dir/parsers/ling3.cpp.o
+[241/287] Building CXX object common/CMakeFiles/llama-common.dir/parsers/lfm2.cpp.o
+[242/287] Building CXX object common/CMakeFiles/llama-common.dir/parsers/llm-jp-harmony.cpp.o
+[243/287] Building CXX object common/CMakeFiles/llama-common.dir/parsers/minicpm5.cpp.o
+[244/287] Building CXX object common/CMakeFiles/llama-common.dir/parsers/ministral3.cpp.o
+[245/287] Building CXX object common/CMakeFiles/llama-common.dir/parsers/minimax-m3.cpp.o
+[246/287] Building CXX object common/CMakeFiles/llama-common.dir/parsers/qwen3-coder.cpp.o
+[247/287] Building CXX object common/CMakeFiles/llama-common.dir/parsers/muse-glimmer.cpp.o
+[248/287] Building CXX object common/CMakeFiles/llama-common.dir/parsers/translate-gemma.cpp.o
+[249/287] Building CXX object common/CMakeFiles/llama-common.dir/chat-auto-parser-generator.cpp.o
+[250/287] Building CXX object common/CMakeFiles/llama-common.dir/chat-auto-parser-helpers.cpp.o
+[251/287] Building CXX object common/CMakeFiles/llama-common.dir/chat-diff-analyzer.cpp.o
+[252/287] Building CXX object common/CMakeFiles/llama-common.dir/arg.cpp.o
+[253/287] Building CXX object common/CMakeFiles/llama-common.dir/chat-peg-parser.cpp.o
+[254/287] Building CXX object common/CMakeFiles/llama-common.dir/chat.cpp.o
+[255/287] Building CXX object common/CMakeFiles/llama-common.dir/common.cpp.o
+[256/287] Building CXX object common/CMakeFiles/llama-common.dir/console.cpp.o
+[257/287] Building CXX object common/CMakeFiles/llama-common.dir/debug.cpp.o
+[258/287] Building CXX object common/CMakeFiles/llama-common.dir/fit.cpp.o
+[259/287] Building CXX object common/CMakeFiles/llama-common.dir/download.cpp.o
+[260/287] Building CXX object common/CMakeFiles/llama-common.dir/imatrix-loader.cpp.o
+[261/287] Building CXX object common/CMakeFiles/llama-common.dir/hf-cache.cpp.o
+[262/287] Building CXX object common/CMakeFiles/llama-common.dir/json-schema.cpp.o
+[263/287] Building CXX object common/CMakeFiles/llama-common.dir/json-schema-to-grammar.cpp.o
+[264/287] Building CXX object common/CMakeFiles/llama-common.dir/llguidance.cpp.o
+[265/287] Building CXX object common/CMakeFiles/llama-common.dir/log.cpp.o
+[266/287] Building CXX object common/CMakeFiles/llama-common.dir/ngram-cache.cpp.o
+[267/287] Building CXX object common/CMakeFiles/llama-common.dir/ngram-map.cpp.o
+[268/287] Building CXX object common/CMakeFiles/llama-common.dir/ngram-mod.cpp.o
+[269/287] Building CXX object common/CMakeFiles/llama-common.dir/json.cpp.o
+[270/287] Building CXX object common/CMakeFiles/llama-common.dir/preset.cpp.o
+[271/287] Building CXX object common/CMakeFiles/llama-common.dir/reasoning-budget.cpp.o
+[272/287] Building CXX object common/CMakeFiles/llama-common.dir/peg-parser.cpp.o
+[273/287] Building CXX object common/CMakeFiles/llama-common.dir/sampling.cpp.o
+[274/287] Building CXX object common/CMakeFiles/llama-common.dir/subproc.cpp.o
+[275/287] Building CXX object common/CMakeFiles/llama-common.dir/trie.cpp.o
+[276/287] Building CXX object common/CMakeFiles/llama-common.dir/unicode.cpp.o
+[277/287] Building CXX object common/CMakeFiles/llama-common.dir/speculative.cpp.o
+[278/287] Building CXX object common/CMakeFiles/llama-common.dir/jinja/lexer.cpp.o
+[279/287] Building CXX object common/CMakeFiles/llama-common.dir/jinja/parser.cpp.o
+[280/287] Building CXX object common/CMakeFiles/llama-common.dir/jinja/runtime.cpp.o
+[281/287] Building CXX object common/CMakeFiles/llama-common.dir/jinja/string.cpp.o
+[282/287] Building CXX object common/CMakeFiles/llama-common.dir/jinja/caps.cpp.o
+[283/287] Building CXX object common/CMakeFiles/llama-common.dir/jinja/value.cpp.o
+[284/287] Linking CXX shared library bin/libllama-common.so.0.6.0
+[285/287] Creating library symlink bin/libllama-common.so.0 bin/libllama-common.so
+[286/287] Building CXX object tests/CMakeFiles/test-backend-ops.dir/test-backend-ops.cpp.o
+[287/287] Linking CXX executable bin/test-backend-ops
+FAILED: [code=1] bin/test-backend-ops 
+: && /usr/bin/c++ -O3 -DNDEBUG -Wl,--dependency-file=tests/CMakeFiles/test-backend-ops.dir/link.d tests/CMakeFiles/test-backend-ops.dir/test-backend-ops.cpp.o -o bin/test-backend-ops  -Wl,-rpath,/home/p51/Github/worktrees/p100-p7a-patches-biasv/third_party/llama.cpp/build-upstream/bin:  bin/libllama-common.so.0.6.0  bin/libllama.so.0.6.0  bin/libggml.so.0.26.0  bin/libggml-cpu.so.0.26.0  bin/libggml-cuda.so.0.26.0  bin/libggml-base.so.0.26.0  /home/p51/Github/P100/tools/cuda-12.8/targets/x86_64-linux/lib/stubs/libcuda.so  common/libllama-common-base.a && :
+/usr/bin/ld: warning: libcudart.so.12, needed by bin/libggml-cuda.so.0.26.0, not found (try using -rpath or -rpath-link)
+/usr/bin/ld: warning: libcublas.so.12, needed by bin/libggml-cuda.so.0.26.0, not found (try using -rpath or -rpath-link)
+/usr/bin/ld: bin/libggml-cuda.so.0.26.0: undefined reference to `cudaFree@libcudart.so.12'
+/usr/bin/ld: bin/libggml-cuda.so.0.26.0: undefined reference to `cudaLaunchKernelExC@libcudart.so.12'
+/usr/bin/ld: bin/libggml-cuda.so.0.26.0: undefined reference to `cudaOccupancyMaxActiveBlocksPerMultiprocessorWithFlags@libcudart.so.12'
+/usr/bin/ld: bin/libggml-cuda.so.0.26.0: undefined reference to `__cudaRegisterFatBinaryEnd@libcudart.so.12'
+/usr/bin/ld: bin/libggml-cuda.so.0.26.0: undefined reference to `cudaStreamWaitEvent@libcudart.so.12'
+/usr/bin/ld: bin/libggml-cuda.so.0.26.0: undefined reference to `cudaStreamBeginCapture@libcudart.so.12'
+/usr/bin/ld: bin/libggml-cuda.so.0.26.0: undefined reference to `cudaDeviceGetPCIBusId@libcudart.so.12'
+/usr/bin/ld: bin/libggml-cuda.so.0.26.0: undefined reference to `cudaDeviceGetAttribute@libcudart.so.12'
+/usr/bin/ld: bin/libggml-cuda.so.0.26.0: undefined reference to `cublasSgemm_v2@libcublas.so.12'
+/usr/bin/ld: bin/libggml-cuda.so.0.26.0: undefined reference to `cudaHostGetDevicePointer@libcudart.so.12'
+/usr/bin/ld: bin/libggml-cuda.so.0.26.0: undefined reference to `cudaDeviceSynchronize@libcudart.so.12'
+/usr/bin/ld: bin/libggml-cuda.so.0.26.0: undefined reference to `cublasStrsmBatched@libcublas.so.12'
+/usr/bin/ld: bin/libggml-cuda.so.0.26.0: undefined reference to `cudaMallocHost@libcudart.so.12'
+/usr/bin/ld: bin/libggml-cuda.so.0.26.0: undefined reference to `cudaEventSynchronize@libcudart.so.12'
+/usr/bin/ld: bin/libggml-cuda.so.0.26.0: undefined reference to `cudaSetDeviceFlags@libcudart.so.12'
+/usr/bin/ld: bin/libggml-cuda.so.0.26.0: undefined reference to `cudaSetDevice@libcudart.so.12'
+/usr/bin/ld: bin/libggml-cuda.so.0.26.0: undefined reference to `cudaLaunchCooperativeKernel@libcudart.so.12'
+/usr/bin/ld: bin/libggml-cuda.so.0.26.0: undefined reference to `cudaEventDestroy@libcudart.so.12'
+/usr/bin/ld: bin/libggml-cuda.so.0.26.0: undefined reference to `__cudaRegisterFunction@libcudart.so.12'
+/usr/bin/ld: bin/libggml-cuda.so.0.26.0: undefined reference to `cudaStreamEndCapture@libcudart.so.12'
+/usr/bin/ld: bin/libggml-cuda.so.0.26.0: undefined reference to `cublasSgemmBatched@libcublas.so.12'
+/usr/bin/ld: bin/libggml-cuda.so.0.26.0: undefined reference to `cudaMalloc@libcudart.so.12'
+/usr/bin/ld: bin/libggml-cuda.so.0.26.0: undefined reference to `cublasSetWorkspace_v2@libcublas.so.12'
+/usr/bin/ld: bin/libggml-cuda.so.0.26.0: undefined reference to `cudaHostRegister@libcudart.so.12'
+/usr/bin/ld: bin/libggml-cuda.so.0.26.0: undefined reference to `cudaGetDeviceCount@libcudart.so.12'
+/usr/bin/ld: bin/libggml-cuda.so.0.26.0: undefined reference to `cudaGraphInstantiate@libcudart.so.12'
+/usr/bin/ld: bin/libggml-cuda.so.0.26.0: undefined reference to `cudaGetErrorString@libcudart.so.12'
+/usr/bin/ld: bin/libggml-cuda.so.0.26.0: undefined reference to `cudaEventRecord@libcudart.so.12'
+/usr/bin/ld: bin/libggml-cuda.so.0.26.0: undefined reference to `cudaGraphDestroy@libcudart.so.12'
+/usr/bin/ld: bin/libggml-cuda.so.0.26.0: undefined reference to `cudaGraphExecDestroy@libcudart.so.12'
+/usr/bin/ld: bin/libggml-cuda.so.0.26.0: undefined reference to `cudaFreeHost@libcudart.so.12'
+/usr/bin/ld: bin/libggml-cuda.so.0.26.0: undefined reference to `cudaStreamDestroy@libcudart.so.12'
+/usr/bin/ld: bin/libggml-cuda.so.0.26.0: undefined reference to `cublasSetStream_v2@libcublas.so.12'
+/usr/bin/ld: bin/libggml-cuda.so.0.26.0: undefined reference to `cublasGemmBatchedEx@libcublas.so.12'
+/usr/bin/ld: bin/libggml-cuda.so.0.26.0: undefined reference to `cudaGetDevice@libcudart.so.12'
+/usr/bin/ld: bin/libggml-cuda.so.0.26.0: undefined reference to `__cudaRegisterFatBinary@libcudart.so.12'
+/usr/bin/ld: bin/libggml-cuda.so.0.26.0: undefined reference to `cudaStreamSynchronize@libcudart.so.12'
+/usr/bin/ld: bin/libggml-cuda.so.0.26.0: undefined reference to `cudaEventCreateWithFlags@libcudart.so.12'
+/usr/bin/ld: bin/libggml-cuda.so.0.26.0: undefined reference to `cudaLaunchKernel@libcudart.so.12'
+/usr/bin/ld: bin/libggml-cuda.so.0.26.0: undefined reference to `cudaFuncSetAttribute@libcudart.so.12'
+/usr/bin/ld: bin/libggml-cuda.so.0.26.0: undefined reference to `cudaMemcpyPeerAsync@libcudart.so.12'
+/usr/bin/ld: bin/libggml-cuda.so.0.26.0: undefined reference to `cublasDestroy_v2@libcublas.so.12'
+/usr/bin/ld: bin/libggml-cuda.so.0.26.0: undefined reference to `cudaFuncGetAttributes@libcudart.so.12'
+/usr/bin/ld: bin/libggml-cuda.so.0.26.0: undefined reference to `cublasGemmEx@libcublas.so.12'
+/usr/bin/ld: bin/libggml-cuda.so.0.26.0: undefined reference to `cublasGemmStridedBatchedEx@libcublas.so.12'
+/usr/bin/ld: bin/libggml-cuda.so.0.26.0: undefined reference to `cublasCreate_v2@libcublas.so.12'
+/usr/bin/ld: bin/libggml-cuda.so.0.26.0: undefined reference to `cudaMemGetInfo@libcudart.so.12'
+/usr/bin/ld: bin/libggml-cuda.so.0.26.0: undefined reference to `cudaMemsetAsync@libcudart.so.12'
+/usr/bin/ld: bin/libggml-cuda.so.0.26.0: undefined reference to `cublasSetMathMode@libcublas.so.12'
+/usr/bin/ld: bin/libggml-cuda.so.0.26.0: undefined reference to `__cudaPushCallConfiguration@libcudart.so.12'
+/usr/bin/ld: bin/libggml-cuda.so.0.26.0: undefined reference to `cudaHostAlloc@libcudart.so.12'
+/usr/bin/ld: bin/libggml-cuda.so.0.26.0: undefined reference to `cudaDeviceEnablePeerAccess@libcudart.so.12'
+/usr/bin/ld: bin/libggml-cuda.so.0.26.0: undefined reference to `cudaMemcpyAsync@libcudart.so.12'
+/usr/bin/ld: bin/libggml-cuda.so.0.26.0: undefined reference to `cudaGraphExecUpdate@libcudart.so.12'
+/usr/bin/ld: bin/libggml-cuda.so.0.26.0: undefined reference to `cudaMemcpy2DAsync@libcudart.so.12'
+/usr/bin/ld: bin/libggml-cuda.so.0.26.0: undefined reference to `cudaMemset@libcudart.so.12'
+/usr/bin/ld: bin/libggml-cuda.so.0.26.0: undefined reference to `cublasGetStatusString@libcublas.so.12'
+/usr/bin/ld: bin/libggml-cuda.so.0.26.0: undefined reference to `cudaHostUnregister@libcudart.so.12'
+/usr/bin/ld: bin/libggml-cuda.so.0.26.0: undefined reference to `cudaStreamCreateWithFlags@libcudart.so.12'
+/usr/bin/ld: bin/libggml-cuda.so.0.26.0: undefined reference to `cudaDeviceCanAccessPeer@libcudart.so.12'
+/usr/bin/ld: bin/libggml-cuda.so.0.26.0: undefined reference to `cublasSgemmStridedBatched@libcublas.so.12'
+/usr/bin/ld: bin/libggml-cuda.so.0.26.0: undefined reference to `cudaPeekAtLastError@libcudart.so.12'
+/usr/bin/ld: bin/libggml-cuda.so.0.26.0: undefined reference to `cudaGraphLaunch@libcudart.so.12'
+/usr/bin/ld: bin/libggml-cuda.so.0.26.0: undefined reference to `cudaStreamIsCapturing@libcudart.so.12'
+/usr/bin/ld: bin/libggml-cuda.so.0.26.0: undefined reference to `cudaMallocManaged@libcudart.so.12'
+/usr/bin/ld: bin/libggml-cuda.so.0.26.0: undefined reference to `__cudaRegisterVar@libcudart.so.12'
+/usr/bin/ld: bin/libggml-cuda.so.0.26.0: undefined reference to `__cudaUnregisterFatBinary@libcudart.so.12'
+/usr/bin/ld: bin/libggml-cuda.so.0.26.0: undefined reference to `__cudaPopCallConfiguration@libcudart.so.12'
+/usr/bin/ld: bin/libggml-cuda.so.0.26.0: undefined reference to `cudaGetDeviceProperties_v2@libcudart.so.12'
+/usr/bin/ld: bin/libggml-cuda.so.0.26.0: undefined reference to `cudaGetLastError@libcudart.so.12'
+collect2: error: ld returned 1 exit status
+ninja: build stopped: subcommand failed.
+[1/13] Linking CXX shared library bin/libggml-base.so.0.26.0
+[2/13] Creating library symlink bin/libggml-base.so.0 bin/libggml-base.so
+[3/13] Linking CXX shared library bin/libggml-cpu.so.0.26.0
+[4/13] Creating library symlink bin/libggml-cpu.so.0 bin/libggml-cpu.so
+[5/13] Linking CUDA shared library bin/libggml-cuda.so.0.26.0
+[6/13] Creating library symlink bin/libggml-cuda.so.0 bin/libggml-cuda.so
+[7/13] Linking CXX shared library bin/libggml.so.0.26.0
+[8/13] Creating library symlink bin/libggml.so.0 bin/libggml.so
+[9/13] Linking CXX shared library bin/libllama.so.0.6.0
+[10/13] Creating library symlink bin/libllama.so.0 bin/libllama.so
+[11/13] Linking CXX shared library bin/libllama-common.so.0.6.0
+[12/13] Creating library symlink bin/libllama-common.so.0 bin/libllama-common.so
+[13/13] Linking CXX executable bin/test-backend-ops

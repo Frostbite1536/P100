@@ -1,0 +1,27 @@
+[19:13:42] env
+[19:13:42] DRYRUN: git -C /tmp/p100-phase0-lfzdkkjj/absent-llama apply --check -R /home/p51/Github/worktrees/p100-p7a-patches-biasv/third_party/patches/0003-tests-biased-V-flash-attention-cases.patch; apply /home/p51/Github/worktrees/p100-p7a-patches-biasv/third_party/patches/0003-tests-biased-V-flash-attention-cases.patch if not already applied
+[19:13:42] DRYRUN: skipping llama.cpp compilation
+[19:13:42] DRYRUN: all tool outputs are FAKE fixtures
+[19:13:42] FA support matrix CUDA0
+[19:13:43] FLASH_ATTN_EXT correctness CUDA0
+FAKE FLASH_ATTN_EXT CUDA0: OK; 1/1 passed (no hardware tested)
+[19:13:43] biased-V correctness: /home/p51/Github/worktrees/p100-p7a-patches-biasv/tests/fixtures/shims/test-backend-ops test -o FLASH_ATTN_EXT -b CUDA0 -p v_bias
+FAKE biased V v_bias=2.000000 CUDA0: OK; 16/16 passed (no hardware tested)
+[19:13:43] FLASH_ATTN_EXT kernel perf CUDA0
+[19:13:43] MUL_MAT correctness CUDA0
+FAKE MUL_MAT CUDA0: OK; 1/1 passed (no hardware tested)
+[19:13:43] MUL_MAT kernel perf CUDA0
+[19:13:43] FA support matrix CUDA1
+[19:13:43] FLASH_ATTN_EXT correctness CUDA1
+FAKE FLASH_ATTN_EXT CUDA1: OK; 1/1 passed (no hardware tested)
+[19:13:43] biased-V correctness: /home/p51/Github/worktrees/p100-p7a-patches-biasv/tests/fixtures/shims/test-backend-ops test -o FLASH_ATTN_EXT -b CUDA1 -p v_bias
+FAKE biased V v_bias=2.000000 CUDA1: OK; 16/16 passed (no hardware tested)
+[19:13:43] FLASH_ATTN_EXT kernel perf CUDA1
+[19:13:43] MUL_MAT correctness CUDA1
+FAKE MUL_MAT CUDA1: OK; 1/1 passed (no hardware tested)
+[19:13:43] MUL_MAT kernel perf CUDA1
+[19:13:44] done: /tmp/p100-phase0-lfzdkkjj/results
+[19:13:44] env
+[19:13:44] DRYRUN: all tool outputs are FAKE fixtures
+[19:13:44] done: /tmp/p100-phase0-lfzdkkjj/results
+phase0: FAKE plumbing checks passed; temporary results removed

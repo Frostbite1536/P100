@@ -4,6 +4,8 @@
 #   STEPS="env perf" bench/phase0.sh   run only some steps (env build support test perf bench p2p multi)
 #   LLAMA=third_party/llama.cpp EXTRA_CMAKE="-DGGML_CUDA_NCCL=ON" bench/phase0.sh
 #                                      same kit against another llama.cpp tree (results tagged by tree name)
+#   PATCHES="third_party/patches/0003-*.patch"   test patches applied before building (idempotent)
+#   DRYRUN=1 STEPS="build test" bench/phase0.sh  use fixtures from PATH; skip compilation
 # Models: one GGUF path per line in bench/models.txt (see bench/models.example.txt).
 # Output: bench/results/phase0-<date>-<host>/ (commit the small text/csv/jsonl files, never models).
 set -euo pipefail
@@ -13,6 +15,8 @@ BUILD=$LLAMA/build-sm60
 STEPS=${STEPS:-"env build support test perf bench p2p multi"}
 REPS=${REPS:-3}
 TAG=${TAG:-$(basename "$LLAMA")}
+DRYRUN=${DRYRUN:-0}
+PATCHES=${PATCHES:-third_party/patches/0003-*.patch}
 EXTRA_CMAKE=${EXTRA_CMAKE:-}
 read -ra EXTRA <<< "$EXTRA_CMAKE"
 OUT=${OUT:-bench/results/phase0-$TAG-$(date +%Y%m%d-%H%M%S)-$(hostname -s 2>/dev/null || hostname)}
@@ -46,6 +50,28 @@ if has env; then
 fi
 
 if has build; then
+  read -ra patch_patterns <<< "$PATCHES"
+  for pattern in "${patch_patterns[@]}"; do
+    # Intentional glob expansion allows a space-separated list of patch patterns.
+    # shellcheck disable=SC2086,SC2206
+    files=( $pattern )
+    for p in "${files[@]}"; do
+      [ -f "$p" ] || { log "missing patch $p"; exit 1; }
+      p=$(realpath "$p")
+      if [ "$DRYRUN" = 1 ]; then
+        log "DRYRUN: git -C $LLAMA apply --check -R $p; apply $p if not already applied"
+      elif git -C "$LLAMA" apply --check -R "$p" >> "$OUT/run.log" 2>&1; then
+        log "patch already applied: $p"
+      else
+        log "apply patch: $p"
+        git -C "$LLAMA" apply "$p" >> "$OUT/run.log" 2>&1 || { log "patch failed: $p"; exit 1; }
+      fi
+    done
+  done
+fi
+if has build && [ "$DRYRUN" = 1 ]; then
+  log "DRYRUN: skipping llama.cpp compilation"
+elif has build; then
   log "build llama.cpp for sm_60"
   if ! { cmake -S "$LLAMA" -B "$BUILD" -G Ninja -DCMAKE_BUILD_TYPE=Release -DGGML_CUDA=ON \
     -DCMAKE_CUDA_ARCHITECTURES=60 -DLLAMA_CURL=OFF -DCMAKE_EXPORT_COMPILE_COMMANDS=ON "${EXTRA[@]}" > "$OUT/build.log" 2>&1 &&
@@ -57,7 +83,12 @@ if has build; then
   else log "  NCCL: NOT linked (install libnccl2 + libnccl-dev for CUDA 12; -sm tensor nccl runs fall back)"; fi
 fi
 # Tool overrides allow fixture runs without a llama.cpp checkout.
-TBO=${TBO:-$BUILD/bin/test-backend-ops}; LB=${LB:-$BUILD/bin/llama-bench}
+if [ "$DRYRUN" = 1 ]; then
+  TBO=${TBO:-$(command -v test-backend-ops)}; LB=${LB:-$(command -v llama-bench)}
+  log "DRYRUN: all tool outputs are FAKE fixtures"
+else
+  TBO=${TBO:-$BUILD/bin/test-backend-ops}; LB=${LB:-$BUILD/bin/llama-bench}
+fi
 
 for ((device = 0; device < ngpu; device++)); do
   dev=CUDA$device
@@ -71,6 +102,11 @@ for ((device = 0; device < ngpu; device++)); do
       log "$op correctness $dev"
       "$TBO" test -o "$op" -b "$dev" > "$OUT/$tag-test-$dev.txt" 2>&1 || log "  correctness failed ($op $dev)"
       { grep -E "FAIL|passed" "$OUT/$tag-test-$dev.txt" || echo "  (no pass/fail summary found)"; } | tail -3 | tee -a "$OUT/run.log"
+      if [ "$op" = FLASH_ATTN_EXT ]; then
+        log "biased-V correctness: $TBO test -o FLASH_ATTN_EXT -b $dev -p v_bias"
+        "$TBO" test -o FLASH_ATTN_EXT -b "$dev" -p v_bias > "$OUT/fa-vbias-test-$dev.txt" 2>&1 || log "  biased-V correctness failed ($dev)"
+        { grep -E "FAIL|passed" "$OUT/fa-vbias-test-$dev.txt" || echo "  (no pass/fail summary found)"; } | tail -3 | tee -a "$OUT/run.log"
+      fi
     fi
     if has perf; then
       log "$op kernel perf $dev"

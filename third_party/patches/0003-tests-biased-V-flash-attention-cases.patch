@@ -1,0 +1,155 @@
+From 35d17d42cdb92fd34eff206567f3c36b79c6e4ec Mon Sep 17 00:00:00 2001
+From: P100 patch worker <p100-patches@localhost>
+Date: Sat, 10 Oct 2026 21:10:41 -0500
+Subject: [PATCH] tests: add biased-V FA cases with an FP32 CPU reference
+
+Test-only: add 16 F16 K/V FLASH_ATTN_EXT cases with V bias 2 in
+channels 0..7, head sizes 128/256, 16K/32K keys and Q counts
+1/4/16/512. Existing names, error metrics and tolerances stay unchanged.
+
+The manager measured all 16 biased-V cases failing on the Maxwell
+M2200 in both builds, with NMSE about 0.36 at 16K keys and 0.60 at
+32K, independent of Q count and head size. Maxwell CUDA FA accumulates
+in FP32, but test-backend-ops sets the CPU backend to reference mode.
+That forces the vec path over all keys, where F16 V used an FP16 output
+accumulator. With V near 2 and near-uniform attention, small positive
+contributions stop changing the FP16 sum.
+
+Only when params->use_ref is true, route F16 V through the existing
+FP32 conversion, scaling and multiply-add branch, and skip the final
+FP16 accumulator conversion. Gate all three FP16 accumulator branches
+with !params->use_ref: non-reference CPU behavior and CUDA kernels
+are unchanged. This makes the biased-V cases compare against FP32
+output accumulation without changing their tolerance.
+
+Implemented by Codex from ticket p7c-cpu-ref-fp32; manager rerun pending.
+Assisted-by: Codex
+---
+ ggml/src/ggml-cpu/ops.cpp  |  7 ++---
+ tests/test-backend-ops.cpp | 54 +++++++++++++++++++++++++++++++++++---
+ 2 files changed, 55 insertions(+), 6 deletions(-)
+
+diff --git a/ggml/src/ggml-cpu/ops.cpp b/ggml/src/ggml-cpu/ops.cpp
+index c7e7c47a7..312713dab 100644
+--- a/ggml/src/ggml-cpu/ops.cpp
++++ b/ggml/src/ggml-cpu/ops.cpp
+@@ -8940,7 +8940,8 @@ static void ggml_compute_forward_flash_attn_ext_f16_one_chunk(
+         ggml_fp16_t * VKQ16 = (ggml_fp16_t *) (VKQ32 + 1*DV); // (temporary) FP16 VKQ accumulator
+         ggml_fp16_t * Q_q   = (ggml_fp16_t *) (VKQ32 + 2*DV); // (temporary) buffer for Q converted to quantized/FP16
+ 
+-        if (v->type == GGML_TYPE_F16) {
++        // Keep the reference output accumulator in FP32, including for F16 V.
++        if (v->type == GGML_TYPE_F16 && !params->use_ref) {
+             memset(VKQ16, 0, DV*sizeof(ggml_fp16_t));
+         } else {
+             memset(VKQ32, 0, DV*sizeof(float));
+@@ -8989,7 +8990,7 @@ static void ggml_compute_forward_flash_attn_ext_f16_one_chunk(
+ 
+             const char * v_data = ((const char *) v->data + (ic*nbv1 + iv2*nbv2 + iv3*nbv3));
+ 
+-            if (v->type == GGML_TYPE_F16) {
++            if (v->type == GGML_TYPE_F16 && !params->use_ref) {
+                 if (s > M) {
+                     // s is new maximum, ms < 1.0f, vs == expf(s - s) == 1.0f
+                     M = s;
+@@ -9030,7 +9031,7 @@ static void ggml_compute_forward_flash_attn_ext_f16_one_chunk(
+             S = S*ms + vs; // scale and increment sum with partial sum
+         }
+ 
+-        if (v->type == GGML_TYPE_F16) {
++        if (v->type == GGML_TYPE_F16 && !params->use_ref) {
+             for (int64_t d = 0; d < DV; ++d) {
+                 VKQ32[d] = GGML_CPU_FP16_TO_FP32(VKQ16[d]);
+             }
+diff --git a/tests/test-backend-ops.cpp b/tests/test-backend-ops.cpp
+index 4e3c6942b..cfb303ca2 100644
+--- a/tests/test-backend-ops.cpp
++++ b/tests/test-backend-ops.cpp
+@@ -8350,9 +8350,14 @@ struct test_flash_attn_ext : public test_case {
+     const bool kv_view; // create K/V as views of a larger buffer (like a KV cache)
+     const bool v_is_view_of_k;
+     const int64_t n_kv_max;
++    const float v_bias;
+ 
+     std::string vars() override {
+-        return VARS_TO_STR17(hsk, hsv, nh, nr23, kv, nb, mask, sinks, max_bias, logit_softcap, prec, type_K, type_V, permute, kv_view, v_is_view_of_k, n_kv_max);
++        std::string params = VARS_TO_STR17(hsk, hsv, nh, nr23, kv, nb, mask, sinks, max_bias, logit_softcap, prec, type_K, type_V, permute, kv_view, v_is_view_of_k, n_kv_max);
++        if (v_bias != 0.0f) {
++            params += "," + VAR_TO_STR(v_bias);
++        }
++        return params;
+     }
+ 
+     double max_nmse_err() override {
+@@ -8369,9 +8374,9 @@ struct test_flash_attn_ext : public test_case {
+     test_flash_attn_ext(int64_t hsk = 128, int64_t hsv = 128, int64_t nh = 32, std::array<int64_t, 2> nr23 = {1, 1}, int64_t kv = 96, int64_t nb = 8,
+                         bool mask = true, bool sinks = false, float max_bias = 0.0f, float logit_softcap = 0.0f, ggml_prec prec = GGML_PREC_F32,
+                         ggml_type type_K = GGML_TYPE_F16, ggml_type type_V = GGML_TYPE_F16, std::array<int32_t, 4> permute = {0, 1, 2, 3},
+-                        bool kv_view = true, bool v_is_view_of_k = false, int64_t n_kv_max = 0)
++                        bool kv_view = true, bool v_is_view_of_k = false, int64_t n_kv_max = 0, float v_bias = 0.0f)
+         : hsk(hsk), hsv(hsv), nh(nh), nr23(nr23), kv(kv), nb(nb), mask(mask), sinks(sinks), max_bias(max_bias), logit_softcap(logit_softcap), prec(prec),
+-          type_K(type_K), type_V(type_V), permute(permute), kv_view(kv_view), v_is_view_of_k(v_is_view_of_k), n_kv_max(n_kv_max) {}
++          type_K(type_K), type_V(type_V), permute(permute), kv_view(kv_view), v_is_view_of_k(v_is_view_of_k), n_kv_max(n_kv_max), v_bias(v_bias) {}
+ 
+     ggml_tensor * build_graph(ggml_context * ctx) override {
+         const int64_t hsk_padded = GGML_PAD(hsk, ggml_blck_size(type_K));
+@@ -8453,6 +8458,39 @@ struct test_flash_attn_ext : public test_case {
+                 init_tensor_uniform(t);
+             }
+         }
++
++        if (v_bias != 0.0f) {
++            ggml_tensor * v = ggml_get_tensor(ctx, "v");
++            std::vector<float> data = tensor_to_float(v);
++            std::vector<uint8_t> storage(ggml_nbytes(v));
++            ggml_backend_tensor_get(v, storage.data(), 0, storage.size());
++            const int64_t bs = ggml_blck_size(v->type);
++            const size_t ts = ggml_type_size(v->type);
++            std::vector<float> imatrix(v->ne[0], 1.0f);
++            std::vector<uint8_t> row(ggml_row_size(v->type, v->ne[0]));
++            size_t r = 0;
++            for (int64_t i3 = 0; i3 < v->ne[3]; ++i3) {
++                for (int64_t i2 = 0; i2 < v->ne[2]; ++i2) {
++                    for (int64_t i1 = 0; i1 < v->ne[1]; ++i1, ++r) {
++                        float * values = data.data() + r*v->ne[0];
++                        for (int64_t i0 = 0; i0 < std::min<int64_t>(8, v->ne[0]); ++i0) {
++                            values[i0] += v_bias;
++                        }
++                        ggml_quantize_chunk(v->type, values, row.data(), 0, 1, v->ne[0], imatrix.data());
++                        const size_t offset = i3*v->nb[3] + i2*v->nb[2] + i1*v->nb[1];
++                        // Keep the gaps in KV cache views and permuted tensors intact.
++                        if (v->nb[0] == ts) {
++                            memcpy(storage.data() + offset, row.data(), row.size());
++                        } else {
++                            for (int64_t i0 = 0; i0 < v->ne[0]/bs; ++i0) {
++                                memcpy(storage.data() + offset + i0*v->nb[0], row.data() + i0*ts, ts);
++                            }
++                        }
++                    }
++                }
++            }
++            ggml_backend_tensor_set(v, storage.data(), 0, storage.size());
++        }
+     }
+ 
+     bool grad_precise() override {
+@@ -11551,6 +11589,16 @@ static std::vector<std::unique_ptr<test_case>> make_test_cases_eval() {
+         }
+     }
+ 
++    // Non-zero V means expose output accumulator rounding at long context.
++    for (int hs : {128, 256}) {
++        for (int kv : {16384, 32768}) {
++            for (int nb : {1, 4, 16, 512}) {
++                test_cases.emplace_back(new test_flash_attn_ext(hs, hs, 1, {4, 1}, kv, nb, false, false, 0, 0,
++                    GGML_PREC_F32, GGML_TYPE_F16, GGML_TYPE_F16, {0, 1, 2, 3}, true, false, 0, 2.0f));
++            }
++        }
++    }
++
+     // prefill-shaped cases with long KV (nb >= 32, kv >= 1024): covers the
+     // XMX/GEMM-accelerated SYCL FA path which only activates for these shapes.
+     for (int kv : { 1024, 2048, }) {
+-- 
+2.43.0
+

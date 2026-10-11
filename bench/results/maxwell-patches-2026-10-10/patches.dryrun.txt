@@ -1,0 +1,42 @@
+[19:13:44] DRYRUN: skipping microbench compilation and execution
+[19:13:44] DRYRUN: git -C /tmp/p100-patches-2k80lxoj/must-not-exist/upstream apply /home/p51/Github/worktrees/p100-p7a-patches-biasv/third_party/patches/0003-tests-biased-V-flash-attention-cases.patch
+[19:13:44] DRYRUN: skipping worktree preparation and build for upstream
+[19:13:44] correctness upstream (full FLASH_ATTN_EXT CUDA0)
+[19:13:44]   rc=0  OK=1  FAIL=0
+[19:13:44] biased-V correctness: /home/p51/Github/worktrees/p100-p7a-patches-biasv/tests/fixtures/shims/test-backend-ops test -b CUDA0 -o FLASH_ATTN_EXT -p v_bias
+[19:13:44]   rc=0  OK=1  FAIL=0
+[19:13:44] correctness upstream (full MUL_MAT CUDA0)
+[19:13:44]   rc=0  OK=1  FAIL=0
+[19:13:44] DRYRUN: git -C /tmp/p100-patches-2k80lxoj/must-not-exist/conv apply /home/p51/Github/worktrees/p100-p7a-patches-biasv/third_party/patches/0001-CUDA-fewer-idle-threads-when-converting-short-non-co.patch
+[19:13:44] DRYRUN: git -C /tmp/p100-patches-2k80lxoj/must-not-exist/conv apply /home/p51/Github/worktrees/p100-p7a-patches-biasv/third_party/patches/0003-tests-biased-V-flash-attention-cases.patch
+[19:13:44] DRYRUN: skipping worktree preparation and build for conv
+[19:13:44] correctness conv (full FLASH_ATTN_EXT CUDA0)
+[19:13:45]   rc=0  OK=1  FAIL=0
+[19:13:45] biased-V correctness: /home/p51/Github/worktrees/p100-p7a-patches-biasv/tests/fixtures/shims/test-backend-ops test -b CUDA0 -o FLASH_ATTN_EXT -p v_bias
+[19:13:45]   rc=0  OK=1  FAIL=0
+[19:13:45] correctness conv (full MUL_MAT CUDA0)
+[19:13:45]   rc=0  OK=1  FAIL=0
+[19:13:45] DRYRUN: git -C /tmp/p100-patches-2k80lxoj/must-not-exist/conv8 apply /home/p51/Github/worktrees/p100-p7a-patches-biasv/third_party/patches/0001-CUDA-fewer-idle-threads-when-converting-short-non-co.patch
+[19:13:45] DRYRUN: git -C /tmp/p100-patches-2k80lxoj/must-not-exist/conv8 apply /home/p51/Github/worktrees/p100-p7a-patches-biasv/third_party/patches/0002-CUDA-vectorized-dequantization-of-non-contiguous-q4_.patch
+[19:13:45] DRYRUN: git -C /tmp/p100-patches-2k80lxoj/must-not-exist/conv8 apply /home/p51/Github/worktrees/p100-p7a-patches-biasv/third_party/patches/0003-tests-biased-V-flash-attention-cases.patch
+[19:13:45] DRYRUN: skipping worktree preparation and build for conv8
+[19:13:45] correctness conv8 (full FLASH_ATTN_EXT CUDA0)
+[19:13:45]   rc=0  OK=1  FAIL=0
+[19:13:45] biased-V correctness: /home/p51/Github/worktrees/p100-p7a-patches-biasv/tests/fixtures/shims/test-backend-ops test -b CUDA0 -o FLASH_ATTN_EXT -p v_bias
+[19:13:45]   rc=0  OK=1  FAIL=0
+[19:13:45] correctness conv8 (full MUL_MAT CUDA0)
+[19:13:45]   rc=0  OK=1  FAIL=0
+[19:13:45] kernel perf upstream round 1  gpu[sm,mem,temp,power,throttle]: FAKE: 1328, 715, 42, 100.0, 0x0000000000000000
+[19:13:45] kernel perf conv round 1  gpu[sm,mem,temp,power,throttle]: FAKE: 1328, 715, 42, 100.0, 0x0000000000000000
+[19:13:45] kernel perf conv8 round 1  gpu[sm,mem,temp,power,throttle]: FAKE: 1328, 715, 42, 100.0, 0x0000000000000000
+[19:13:45] kernel perf upstream round 2  gpu[sm,mem,temp,power,throttle]: FAKE: 1328, 715, 42, 100.0, 0x0000000000000000
+[19:13:46] kernel perf conv round 2  gpu[sm,mem,temp,power,throttle]: FAKE: 1328, 715, 42, 100.0, 0x0000000000000000
+[19:13:46] kernel perf conv8 round 2  gpu[sm,mem,temp,power,throttle]: FAKE: 1328, 715, 42, 100.0, 0x0000000000000000
+[19:13:46] llama-bench kv model upstream round 1  gpu[sm,mem,temp,power,throttle]: FAKE: 1328, 715, 42, 100.0, 0x0000000000000000
+[19:13:46] llama-bench kv model conv round 1  gpu[sm,mem,temp,power,throttle]: FAKE: 1328, 715, 42, 100.0, 0x0000000000000000
+[19:13:46] llama-bench kv model conv8 round 1  gpu[sm,mem,temp,power,throttle]: FAKE: 1328, 715, 42, 100.0, 0x0000000000000000
+[19:13:46] llama-bench kv model upstream round 2  gpu[sm,mem,temp,power,throttle]: FAKE: 1328, 715, 42, 100.0, 0x0000000000000000
+[19:13:46] llama-bench kv model conv round 2  gpu[sm,mem,temp,power,throttle]: FAKE: 1328, 715, 42, 100.0, 0x0000000000000000
+[19:13:46] llama-bench kv model conv8 round 2  gpu[sm,mem,temp,power,throttle]: FAKE: 1328, 715, 42, 100.0, 0x0000000000000000
+[19:13:47] done: /tmp/p100-patches-2k80lxoj/results (summary.md)
+patches: FAKE plumbing checks passed; temporary results removed
