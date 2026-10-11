@@ -88,6 +88,8 @@ endif()
 if(Python3_Interpreter_FOUND)
   add_test(NAME decode_model
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/decode_model_check.py)
+  add_test(NAME calibrate_decode
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/decode_model_check.py --calibrate)
   if(DEFINED ENV{P100_NVCC})
     set(_vecdot_nvcc "$ENV{P100_NVCC}")
   else()

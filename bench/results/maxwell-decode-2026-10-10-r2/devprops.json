@@ -1,0 +1,1 @@
+{"label":"Maxwell M2200","name":"Quadro M2200","major":5,"minor":2,"sm_count":8,"clock_khz":1036000,"memory_clock_khz":2754000,"memory_bus_bits":128,"source":"cudaGetDeviceProperties(device=0)"}

@@ -1,0 +1,18 @@
+PREDICTIONS: Maxwell M2200 measured device clocks and theoretical GDDR bandwidth; uncalibrated unless efficiencies supplied; ignores activations, KV cache, attention and launch overhead
+model=shape weights=58,720,256 batch=3 variant=m2200 GDDR=88.128 GB/s issue=1060.864000 Glane-instructions/s bw_eff=1 issue_eff=1
+Single weight matrix m=4096,k=14336; one read per step.
+Weights read once per batch step; bytes/token = bytes/step / batch; tokens/s = batch / step time.
+sm_61 counts use the Maxwell M2200 issue rate as a reference: "if dp4a existed".
+f16: bandwidth-only ceiling; no measured ALU count.
+Times in ms; step = max(bw, alu). GB uses decimal units.
+type      GB/step  GB/token     bw_ms   alu52_ms bound52  step52_ms   tok52/s   alu61_ms bound61  step61_ms   tok61/s
+q4_0     0.033030  0.011010  0.374797   0.674595     alu   0.674595  4447.115   0.217946      bw   0.374797  8004.325
+q4_1     0.036700  0.012233  0.416442   0.638270     alu   0.638270  4700.203   0.212757      bw   0.416442  7203.892
+q5_0     0.040370  0.013457  0.458086   1.136432     alu   1.136432  2639.840   0.570811     alu   0.570811  5255.682
+q5_1     0.044040  0.014680  0.499730   1.157189     alu   1.157189  2592.489   0.570811     alu   0.570811  5255.682
+q8_0     0.062390  0.020797  0.707951   0.607135      bw   0.707951  4237.584   0.186811      bw   0.707951  4237.584
+q4_K     0.033030  0.011010  0.374797   0.910703     alu   0.910703  3294.160   0.441081     alu   0.441081  6801.471
+q5_K     0.040370  0.013457  0.458086   1.032000     alu   1.032000  2906.977   0.529297     alu   0.529297  5667.892
+q6_K     0.048169  0.016056  0.546580   1.270703     alu   1.270703  2360.898   0.633730     alu   0.633730  4733.879
+iq4_xs   0.031195  0.010398  0.353975   0.936000     alu   0.936000  3205.128   0.451459     alu   0.451459  6645.115
+f16      0.117441  0.039147  1.332613        n/a bw-only   1.332613  2251.216        n/a bw-only   1.332613  2251.216
