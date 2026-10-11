@@ -67,6 +67,7 @@ struct TiledModelConfig {
     bool o_accum_fp16 = false;  // FP16 tile rescale and per-key fused P*V updates
     int kv_parallel_blocks = 1;  // KV tile t belongs to part t % kv_parallel_blocks
     int o_accum_np = 1;          // key j within a tile belongs to accumulator j % o_accum_np
+    bool o_accum_fp16_tile_flush = false;  // flush each FP16 P*V tile to FP32; rescale and combine in FP32
 };
 
 void attention_tiled_model(const AttnParams& p, const TiledModelConfig& cfg, const float* q, const float* k,
