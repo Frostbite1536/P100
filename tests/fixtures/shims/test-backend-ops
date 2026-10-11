@@ -18,7 +18,8 @@ op = opts['-o']
 assert op in ('FLASH_ATTN_EXT', 'MUL_MAT')
 assert set(opts) <= {'-b', '-o', '-p', '--output'}
 with open(os.environ['SHIM_CALL_LOG'], 'a') as f:
-    f.write(json.dumps(dict(tool='tbo', mode=mode, opts=opts)) + '\n')
+    f.write(json.dumps(dict(tool='tbo', mode=mode, opts=opts,
+                           disable_mmvh=os.environ.get('GGML_CUDA_DISABLE_MMVH'))) + '\n')
 if mode != 'perf':
     if '-p' in opts:
         assert mode == 'test' and op == 'FLASH_ATTN_EXT' and opts['-p'] == 'v_bias'
@@ -30,6 +31,23 @@ assert opts['--output'] == 'sql'
 print('-- FAKE synthetic timings for plumbing tests only')
 print('CREATE TABLE test_backend_ops (op_name TEXT, op_params TEXT, supported INTEGER, time_us REAL, test_mode TEXT);')
 count = 0
+if op == 'MUL_MAT' and '-p' in opts:
+    # Positive cases and controls: unsupported types/RHS, n outside 1..8,
+    # permuted tensors and strided views must all be excluded by the runner.
+    for dtype, rhs, n, per, view in itertools.product(
+            ('q4_0', 'q8_0', 'q4_K', 'q5_K', 'q6_K', 'f16', 'q4_0_extra'),
+            ('f32', 'f16'), (0, *range(1, 9), 9, 10, 18),
+            ('[0,1,2,3]', '[1,0,2,3]'), (0, 1, 10)):
+        params = f'type_a={dtype},type_b={rhs},m=129,n={n},k=4096,bs=[1,1],nr=[1,1],per={per},v={view}'
+        selected = bool(re.search(opts['-p'], params))
+        expected = (dtype in ('q4_0', 'q8_0', 'q4_K', 'q5_K', 'q6_K') and rhs == 'f32'
+                    and 1 <= n <= 8 and per == '[0,1,2,3]' and view == 0)
+        assert selected == expected, f'incorrect contiguous decode filter: {params}'
+        if selected:
+            print(f"INSERT INTO test_backend_ops VALUES ('{op}', '{params}', 1, 1000.0, 'perf');")
+            count += 1
+    assert count == 40, f'perf filter lost required shapes: {count}/40'
+    sys.exit(0)
 for hs, gqa, kv, nb, dtype in itertools.product((128, 256), (4, 6, 8), (4096, 32768), (3, 4, 8, 16), ('f16', 'q8_0', 'q4_0')):
     params = f'hsk={hs},hsv={hs},nh=4,nr23=[{gqa},1],kv={kv},nb={nb},mask=1,type_K={dtype},type_V={dtype}'
     if '-p' in opts and not re.search(opts['-p'], params):

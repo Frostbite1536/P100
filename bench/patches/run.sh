@@ -1,19 +1,30 @@
 #!/bin/bash
-# A/B the P100 conversion patches, cumulatively over third_party/patches/.
+# Day-one P100 A/B kit; explicit patch lists from third_party/patches/.
 #   bench/patches/run.sh
 #   MODELS="/m/llama.gguf /m/gemma.gguf" ROUNDS=5 bench/patches/run.sh
-#   STEPS="test perf lb" bench/patches/run.sh   reuse prepared builds
-#   DRYRUN=1 OUT=/tmp/patches STEPS="test perf lb" bench/patches/run.sh
-#     use test-backend-ops / llama-bench from PATH; skip worktrees and compilation.
-# Variants: upstream (0003), conv (0001+0003), conv8 (0001-0003).
-# Results: bench/results/patches-<stamp>-<host>/; summary.md uses analyze.py tbo/lb.
+#   MODELS="/m/llama.gguf" PPL_TEXT=/data/wiki.test.txt bench/patches/run.sh
+#   STEPS="test perf mmperf lb ppl" bench/patches/run.sh   reuse prepared builds
+#   DRYRUN=1 OUT=/tmp/patches MODELS=/FAKE/model.gguf PPL_TEXT=/FAKE/wiki.txt bench/patches/run.sh
+#     use bundled FAKE shims; skip worktrees, compilation, model/text access.
+# Variants: upstream=0003; conv=0001,0003; conv8=0001,0002,0003;
+#   flush=0001,0002,0003,0004; mmvh=0001,0002,0003,0005; all=0001-0005.
+# Default variants: upstream conv8 flush mmvh. Default steps:
+#   micro (conversion), build, test (full FA, biased-V, MUL_MAT),
+#   perf (FA), mmperf (contiguous F32 MUL_MAT n=1..8), lb (kv and tg128), ppl.
+# ROADMAP questions: 0004 fixes biased-V? test + perf/lb measure its FA/pp/tg cost;
+#   H1/0005 decode correctness/speed? test + mmperf/lb + ppl cover Accept if.
+# GGML_CUDA_DISABLE_MMVH is presence-checked: enabled runs unset it; mmvh/all
+#   also run MUL_MAT correctness, mmperf, lb and ppl with it set to 1 (-nommvh).
+# PPL requires explicit MODELS and PPL_TEXT; otherwise it logs a skip.
+# Results: bench/results/patches-<stamp>-<host>/; summary.md uses analyze.py tbo/lb
+#   (calibrate-decode.py is absent in this tree) and final PPL +/- error log lines.
 set -euo pipefail
 cd "$(dirname "$0")/../.." || exit 2
 ROOT=$PWD
 LLAMA_SRC=${LLAMA_SRC:-$ROOT/third_party/llama.cpp}
-WORK=${WORK:-$ROOT/third_party/patches-ab}
-VARIANTS=${VARIANTS:-"upstream conv conv8"}
-STEPS=${STEPS:-"micro build test perf lb"}
+WORK=${WORK:-$ROOT/build/patches-ab}
+VARIANTS=${VARIANTS:-"upstream conv8 flush mmvh"}
+STEPS=${STEPS:-"micro build test perf mmperf lb ppl"}
 DRYRUN=${DRYRUN:-0}
 ROUNDS=${ROUNDS:-3}
 LB_ROUNDS=${LB_ROUNDS:-2}
@@ -23,33 +34,57 @@ OUT=${OUT:-$ROOT/bench/results/patches-$(date +%Y%m%d-%H%M%S)-$(hostname -s 2>/d
 mkdir -p "$OUT"
 log() { echo "[$(date +%T)] $*" | tee -a "$OUT/run.log"; }
 has() { [[ " $STEPS " == *" $1 "* ]]; }
+if [ "$DRYRUN" = 1 ]; then
+    export PATH="$ROOT/tests/fixtures/shims:$PATH"
+    export SHIM_CALL_LOG=${SHIM_CALL_LOG:-$OUT/shim-calls.jsonl}
+fi
 gpu_state() { nvidia-smi --query-gpu=clocks.sm,clocks.mem,temperature.gpu,power.draw,clocks_throttle_reasons.active \
-    --format=csv,noheader 2>/dev/null | head -1 || echo "n/a"; }
+    --format=csv,noheader 2>/dev/null | sed -n '1p' || echo "n/a"; }
 export CCACHE_BASEDIR=$WORK CCACHE_NOHASHDIR=1 CCACHE_MAXSIZE=${CCACHE_MAXSIZE:-20G}
 
-gpu=$(nvidia-smi --query-gpu=name --format=csv,noheader | head -1)
+gpu=$(nvidia-smi --query-gpu=name --format=csv,noheader | sed -n '1p')
 [[ "$gpu" == *P100* || "${FORCE:-0}" == 1 ]] || { echo "GPU is '$gpu', not a P100 (FORCE=1 to override)" >&2; exit 2; }
 ver=$(nvcc --version | sed -n 's/.*release \([0-9.]*\),.*/\1/p')
 [ "$ver" = 12.8 ] || [ "${FORCE:-0}" = 1 ] || { echo "nvcc is '$ver'; CUDA 12.8 required (13 dropped sm_60; 12.9: llama.cpp #28416). FORCE=1 to override" >&2; exit 2; }
 
-npatch() {
+ordinals_for() {
     case $1 in
-        upstream) echo 0 ;; conv) echo 1 ;; conv8) echo 2 ;;
+        upstream) echo 3 ;; conv) echo '1 3' ;; conv8) echo '1 2 3' ;;
+        flush) echo '1 2 3 4' ;; mmvh) echo '1 2 3 5' ;; all) echo '1 2 3 4 5' ;;
         *) echo "unknown variant $1" >&2; return 2 ;;
     esac
 }
 patches_for() {
-    local n k
-    n=$(npatch "$1") || return 2
-    for ((k = 1; k <= n; k++)); do
+    local ordinals k
+    ordinals=$(ordinals_for "$1") || return 2
+    for k in $ordinals; do
         # Exactly one patch per ordinal, including in fixture mode.
         local files=("$PATCHES"/"$(printf '%04d' "$k")"-*.patch)
         [ ${#files[@]} = 1 ] && [ -f "${files[0]}" ] || { echo "missing or ambiguous patch $k" >&2; return 2; }
         printf '%s\n' "${files[@]}"
     done
-    local tests=("$PATCHES"/0003-*.patch)
-    [ ${#tests[@]} = 1 ] && [ -f "${tests[0]}" ] || { echo "missing or ambiguous patch 3" >&2; return 2; }
-    printf '%s\n' "${tests[@]}"
+}
+has_mmvh() { [[ " $(ordinals_for "$1") " == *' 5 '* ]]; }
+# Alternate labels share the same binary. Always unset the presence-checked switch
+# first so an inherited value (even 0) cannot silently disable the enabled arm.
+arms_for() { echo "$1"; if has_mmvh "$1"; then echo "$1-nommvh"; fi; }
+run_arm() {
+    local arm=$1; shift
+    if [[ "$arm" == *-nommvh ]]; then
+        env -u GGML_CUDA_DISABLE_MMVH GGML_CUDA_DISABLE_MMVH=1 "$@"
+    else
+        env -u GGML_CUDA_DISABLE_MMVH "$@"
+    fi
+}
+planned() {
+    [ "$DRYRUN" = 1 ] || return 0
+    local arm=$1 command; shift
+    printf -v command ' %q' "$@"
+    if [[ "$arm" == *-nommvh ]]; then
+        log "DRYRUN command: env -u GGML_CUDA_DISABLE_MMVH GGML_CUDA_DISABLE_MMVH=1$command"
+    else
+        log "DRYRUN command: env -u GGML_CUDA_DISABLE_MMVH$command"
+    fi
 }
 for v in $VARIANTS; do patches_for "$v" > /dev/null; done
 
@@ -57,6 +92,7 @@ if [ "$DRYRUN" = 1 ]; then
     base="DRYRUN: no llama.cpp checkout or build; all tool outputs are FAKE fixtures"
     DRY_TBO=$(command -v test-backend-ops)
     DRY_LB=$(command -v llama-bench)
+    DRY_PPL=$(command -v llama-perplexity)
 else
     base=$(git -C "$LLAMA_SRC" rev-parse HEAD)
 fi
@@ -83,10 +119,21 @@ fi
 # Local perf cases: same shapes and session for quantised K/V and the f16 reference (INV-PERF-004).
 PERF_CASES='    for (int hs : {128, 256}) { for (int gqa : {4, 6, 8}) { for (int kv : {4096, 32768}) { for (int nb : {3, 4, 8, 16}) { for (ggml_type t : {GGML_TYPE_F16, GGML_TYPE_Q8_0, GGML_TYPE_Q4_0}) { test_cases.emplace_back(new test_flash_attn_ext(hs, hs, 4, {gqa, 1}, kv, nb, true, false, 0, 0, GGML_PREC_F32, t, t)); } } } } } // P100 patches harness'
 PERF_FILTER='hsk=(128|256),hsv=(128|256),nh=4,nr23=\[[468],1\],kv=(4096|32768),nb=(3|4|8|16),.*type_K=(f16|q8_0|q4_0),type_V=(f16|q8_0|q4_0)'
+MM_FILTER='type_a=(q4_0|q8_0|q4_K|q5_K|q6_K),type_b=f32,.*n=[1-8],k=.*per=\[0,1,2,3\],v=0(,|$)'
+PPL_READY=0
+if has ppl; then
+    if [ -n "${PPL_TEXT:-}" ] && [ -n "${MODELS:-}" ]; then
+        if [ "$DRYRUN" != 1 ] && [ ! -f "$PPL_TEXT" ]; then log "missing PPL_TEXT: $PPL_TEXT"; exit 2; fi
+        PPL_READY=1
+    else log "ppl skipped: set PPL_TEXT and MODELS"; fi
+fi
 
 # Select binaries per variant. Fixture mode deliberately never touches WORK.
 tbo_for() { if [ "$DRYRUN" = 1 ]; then echo "$DRY_TBO"; else echo "$WORK/$1/build/bin/test-backend-ops"; fi; }
 lb_for() { if [ "$DRYRUN" = 1 ]; then echo "$DRY_LB"; else echo "$WORK/$1/build/bin/llama-bench"; fi; }
+ppl_for() { if [ "$DRYRUN" = 1 ]; then echo "$DRY_PPL"; else echo "$WORK/$1/build/bin/llama-perplexity"; fi; }
+targets=(test-backend-ops llama-bench)
+[ "$PPL_READY" = 0 ] || targets+=(llama-perplexity)
 built=()
 if has build && [ "$DRYRUN" != 1 ]; then
     mkdir -p "$WORK"
@@ -109,60 +156,106 @@ for v in $VARIANTS; do
         log "build $v for sm_60"
         if ! { cmake -S "$src" -B "$src/build" -G Ninja -DCMAKE_BUILD_TYPE=Release -DGGML_CUDA=ON \
                  -DCMAKE_CUDA_ARCHITECTURES=60 -DBUILD_SHARED_LIBS=OFF -DLLAMA_CURL=OFF > "$OUT/$v.build.log" 2>&1 &&
-               cmake --build "$src/build" --target test-backend-ops llama-bench >> "$OUT/$v.build.log" 2>&1; }; then
+               cmake --build "$src/build" --target "${targets[@]}" >> "$OUT/$v.build.log" 2>&1; }; then
             log "  BUILD FAILED for $v"; tail -15 "$OUT/$v.build.log" | tee -a "$OUT/run.log"; continue
         fi
     elif has build; then
         while IFS= read -r p; do log "DRYRUN: git -C $src apply $p"; done < <(patches_for "$v")
         log "DRYRUN: skipping worktree preparation and build for $v"
+        log "DRYRUN: cmake --build $src/build --target ${targets[*]}"
     fi
-    if { has test || has perf; } && [ ! -x "$(tbo_for "$v")" ]; then log "missing test-backend-ops for $v; run STEPS=build first"; exit 1; fi
+    if { has test || has perf || has mmperf; } && [ ! -x "$(tbo_for "$v")" ]; then log "missing test-backend-ops for $v; run STEPS=build first"; exit 1; fi
     if has lb && [ ! -x "$(lb_for "$v")" ]; then log "missing llama-bench for $v; run STEPS=build first"; exit 1; fi
+    if [ "$PPL_READY" = 1 ] && [ ! -x "$(ppl_for "$v")" ]; then log "missing llama-perplexity for $v; run STEPS=build first"; exit 1; fi
     built+=("$v")
     if has test; then
         for op in FLASH_ATTN_EXT MUL_MAT; do
             tag=fa; [ "$op" = MUL_MAT ] && tag=mulmat
             log "correctness $v (full $op CUDA0)"
-            "$(tbo_for "$v")" test -b CUDA0 -o "$op" > "$OUT/$v.$tag-test-CUDA0.txt" 2>&1 && rc=0 || rc=$?
+            run_arm "$v" "$(tbo_for "$v")" test -b CUDA0 -o "$op" > "$OUT/$v.$tag-test-CUDA0.txt" 2>&1 && rc=0 || rc=$?
             log "  rc=$rc  OK=$(grep -c 'OK' "$OUT/$v.$tag-test-CUDA0.txt" || true)  FAIL=$(grep -c 'FAIL' "$OUT/$v.$tag-test-CUDA0.txt" || true)"
             if [ "$op" = FLASH_ATTN_EXT ]; then
                 log "biased-V correctness: $(tbo_for "$v") test -b CUDA0 -o FLASH_ATTN_EXT -p v_bias"
-                "$(tbo_for "$v")" test -b CUDA0 -o FLASH_ATTN_EXT -p v_bias > "$OUT/$v.fa-vbias-test-CUDA0.txt" 2>&1 && rc=0 || rc=$?
+                run_arm "$v" "$(tbo_for "$v")" test -b CUDA0 -o FLASH_ATTN_EXT -p v_bias > "$OUT/$v.fa-vbias-test-CUDA0.txt" 2>&1 && rc=0 || rc=$?
                 log "  rc=$rc  OK=$(grep -c 'OK' "$OUT/$v.fa-vbias-test-CUDA0.txt" || true)  FAIL=$(grep -c 'FAIL' "$OUT/$v.fa-vbias-test-CUDA0.txt" || true)"
             fi
         done
+        if has_mmvh "$v"; then
+            log "correctness $v-nommvh (full MUL_MAT CUDA0)"
+            planned "$v-nommvh" "$(tbo_for "$v")" test -b CUDA0 -o MUL_MAT
+            run_arm "$v-nommvh" "$(tbo_for "$v")" test -b CUDA0 -o MUL_MAT > "$OUT/$v-nommvh.mulmat-test-CUDA0.txt" 2>&1 && rc=0 || rc=$?
+            log "  rc=$rc  OK=$(grep -c 'OK' "$OUT/$v-nommvh.mulmat-test-CUDA0.txt" || true)  FAIL=$(grep -c 'FAIL' "$OUT/$v-nommvh.mulmat-test-CUDA0.txt" || true)"
+        fi
     fi
 done
 [ ${#built[@]} -gt 0 ] || { log "no variant built"; exit 1; }
 
-has perf || ROUNDS=0
+{ has perf || has mmperf; } || ROUNDS=0
 for ((i = 1; i <= ROUNDS; i++)); do
     for v in "${built[@]}"; do
-        log "kernel perf $v round $i  gpu[sm,mem,temp,power,throttle]: $(gpu_state)"
-        stdbuf -oL "$(tbo_for "$v")" perf -b CUDA0 -o FLASH_ATTN_EXT -p "$PERF_FILTER" \
-            --output sql > "$OUT/$v.perf.r$i.sql" 2> "$OUT/$v.perf.r$i.err" || log "  perf run failed (see .err)"
+        if has perf; then
+            log "kernel perf $v round $i  gpu[sm,mem,temp,power,throttle]: $(gpu_state)"
+            run_arm "$v" stdbuf -oL "$(tbo_for "$v")" perf -b CUDA0 -o FLASH_ATTN_EXT -p "$PERF_FILTER" \
+                --output sql > "$OUT/$v.perf.r$i.sql" 2> "$OUT/$v.perf.r$i.err" || log "  perf run failed (see .err)"
+        fi
     done
+    if has mmperf; then
+        for v in "${built[@]}"; do
+            while IFS= read -r arm; do
+                log "MUL_MAT perf $arm round $i  gpu[sm,mem,temp,power,throttle]: $(gpu_state)"
+                planned "$arm" "$(tbo_for "$v")" perf -o MUL_MAT -b CUDA0 -p "$MM_FILTER" --output sql
+                run_arm "$arm" stdbuf -oL "$(tbo_for "$v")" perf -o MUL_MAT -b CUDA0 -p "$MM_FILTER" \
+                    --output sql > "$OUT/$arm.mmperf.r$i.sql" 2> "$OUT/$arm.mmperf.r$i.err" || log "  mmperf run failed (see .err)"
+            done < <(arms_for "$v")
+        done
+    fi
 done
 
 # MODELS is an optional space-separated override; otherwise use bench/models.txt.
 models=()
 if [ -n "${MODELS:-}" ]; then read -ra models <<< "$MODELS"
-elif [ -f bench/models.txt ]; then
+elif has lb && [ "$DRYRUN" != 1 ] && [ -f bench/models.txt ]; then
     while IFS= read -r m || [ -n "$m" ]; do
         [[ -z "$m" || "$m" == \#* ]] || models+=("$m")
     done < bench/models.txt
 fi
-has lb || models=()
 for m in "${models[@]}"; do
     n=$(basename "$m" .gguf)
-    for ((i = 1; i <= LB_ROUNDS; i++)); do
-        for v in "${built[@]}"; do
-            log "llama-bench kv $n $v round $i  gpu[sm,mem,temp,power,throttle]: $(gpu_state)"
-            "$(lb_for "$v")" -m "$m" -dev CUDA0 -ngl 99 -fa on -r "$REPS" -o jsonl \
-                -ctk f16,q8_0,q4_0 -ctv f16,q8_0,q4_0 -p 8 -n 64 -d 16384 \
-                > "$OUT/$v.$n.kv.r$i.jsonl" 2> "$OUT/$v.$n.kv.r$i.err" || log "  llama-bench failed"
+    if has lb; then
+        for ((i = 1; i <= LB_ROUNDS; i++)); do
+            for v in "${built[@]}"; do
+                while IFS= read -r arm; do
+                    log "llama-bench kv $n $arm round $i  gpu[sm,mem,temp,power,throttle]: $(gpu_state)"
+                    planned "$arm" "$(lb_for "$v")" -m "$m" -dev CUDA0 -ngl 99 -fa on -r "$REPS" -o jsonl \
+                        -ctk f16,q8_0,q4_0 -ctv f16,q8_0,q4_0 -p 8 -n 64 -d 16384
+                    run_arm "$arm" "$(lb_for "$v")" -m "$m" -dev CUDA0 -ngl 99 -fa on -r "$REPS" -o jsonl \
+                        -ctk f16,q8_0,q4_0 -ctv f16,q8_0,q4_0 -p 8 -n 64 -d 16384 \
+                        > "$OUT/$arm.$n.kv.r$i.jsonl" 2> "$OUT/$arm.$n.kv.r$i.err" || log "  llama-bench failed"
+                    for depth in 0 4096; do
+                        log "llama-bench tg128 depth $depth $n $arm round $i  gpu[sm,mem,temp,power,throttle]: $(gpu_state)"
+                        planned "$arm" "$(lb_for "$v")" -m "$m" -dev CUDA0 -ngl 99 -fa on -r "$REPS" -o jsonl -p 0 -n 128 -d "$depth"
+                        run_arm "$arm" "$(lb_for "$v")" -m "$m" -dev CUDA0 -ngl 99 -fa on -r "$REPS" -o jsonl -p 0 -n 128 -d "$depth" \
+                            > "$OUT/$arm.$n.tg128-d$depth.r$i.jsonl" 2> "$OUT/$arm.$n.tg128-d$depth.r$i.err" || log "  llama-bench failed"
+                    done
+                done < <(arms_for "$v")
+            done
         done
-    done
+    fi
+    if [ "$PPL_READY" = 1 ]; then
+        for v in "${built[@]}"; do
+            while IFS= read -r arm; do
+                log "perplexity $n $arm"
+                planned "$arm" "$(ppl_for "$v")" -m "$m" -f "$PPL_TEXT" -c 512 --chunks 32 -ngl 99 -fa on
+                run_arm "$arm" "$(ppl_for "$v")" -m "$m" -f "$PPL_TEXT" -c 512 --chunks 32 -ngl 99 -fa on \
+                    > "$OUT/$arm.$n.ppl.txt" 2>&1 || log "  perplexity failed (see .ppl.txt)"
+            done < <(arms_for "$v")
+        done
+    fi
+done
+
+arms=()
+for v in "${built[@]}"; do
+    while IFS= read -r arm; do arms+=("$arm"); done < <(arms_for "$v")
 done
 
 {
@@ -176,7 +269,7 @@ done
         echo "## Conversion microbenchmark (bench/micro/dequant_nc.cu)"; echo
         sed 's/^/    /' "$OUT/dequant_nc.txt"; echo
     fi
-    if [ "$ROUNDS" -gt 0 ]; then
+    if has perf && [ "$ROUNDS" -gt 0 ]; then
         echo "## Kernel timing (median of $ROUNDS interleaved rounds)"; echo
         groups=()
         for v in "${built[@]}"; do
@@ -185,18 +278,38 @@ done
         done
         python3 "$ROOT/bench/analyze.py" tbo "${groups[@]}" --labels "$(IFS=,; echo "${built[*]}")" 2>&1 || echo "analyze tbo failed"
     fi
+    if has mmperf && [ "$ROUNDS" -gt 0 ]; then
+        echo; echo "## MUL_MAT timing (median of $ROUNDS interleaved rounds)"; echo
+        groups=()
+        for arm in "${arms[@]}"; do
+            g=""; for ((i = 1; i <= ROUNDS; i++)); do g+="${g:+,}$OUT/$arm.mmperf.r$i.sql"; done
+            groups+=("$g")
+        done
+        python3 "$ROOT/bench/analyze.py" tbo "${groups[@]}" --labels "$(IFS=,; echo "${arms[*]}")" 2>&1 || echo "analyze tbo failed"
+    fi
     for m in "${models[@]}"; do
         n=$(basename "$m" .gguf)
-        vs=(); gs=()
-        for v in "${built[@]}"; do
-            g=""; for ((i = 1; i <= LB_ROUNDS; i++)); do
-                f=$OUT/$v.$n.kv.r$i.jsonl; [ -s "$f" ] && g+="${g:+,}$f"
+        if has lb; then
+            for kind in kv tg128-d0 tg128-d4096; do
+                vs=(); gs=()
+                for arm in "${arms[@]}"; do
+                    g=""; for ((i = 1; i <= LB_ROUNDS; i++)); do
+                        f=$OUT/$arm.$n.$kind.r$i.jsonl; [ -s "$f" ] && g+="${g:+,}$f"
+                    done
+                    [ -n "$g" ] && { vs+=("$arm"); gs+=("$g"); }
+                done
+                [ ${#gs[@]} -gt 0 ] || continue
+                echo; echo "## llama-bench $n $kind (median of rounds)"; echo
+                python3 "$ROOT/bench/analyze.py" lb "${gs[@]}" --labels "$(IFS=,; echo "${vs[*]}")" 2>&1 || echo "analyze lb failed"
             done
-            [ -n "$g" ] && { vs+=("$v"); gs+=("$g"); }
-        done
-        [ ${#gs[@]} -gt 0 ] || continue
-        echo; echo "## llama-bench $n kv (median of rounds)"; echo
-        python3 "$ROOT/bench/analyze.py" lb "${gs[@]}" --labels "$(IFS=,; echo "${vs[*]}")" 2>&1 || echo "analyze lb failed"
+        fi
+        if [ "$PPL_READY" = 1 ]; then
+          echo; echo "## Perplexity $n (512 context, 32 chunks)"; echo
+          for arm in "${arms[@]}"; do
+              echo "- $arm ($arm.$n.ppl.txt):"
+              grep -E 'PPL.*(\+/-|±)' "$OUT/$arm.$n.ppl.txt" | tail -1 || echo "  final PPL +/- error missing; inspect log"
+          done
+        fi
     done
 } > "$OUT/summary.md"
 log "done: $OUT (summary.md)"
