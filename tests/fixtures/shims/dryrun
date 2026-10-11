@@ -19,7 +19,7 @@ with tempfile.TemporaryDirectory(prefix=f'p100-{kind}-') as tmp:
     env = dict(os.environ, PATH=f'{shims}:{os.environ["PATH"]}', OUT=str(tmp / 'results'),
                SHIM_CALL_LOG=str(tmp / 'calls.jsonl'), FORCE='0')
     # Isolate the tests from inherited benchmark settings and local model lists.
-    for key in ('TBO', 'LB', 'MODELS', 'VARIANTS', 'ROUNDS', 'LB_ROUNDS', 'STEPS', 'DRYRUN', 'LLAMA', 'TAG', 'SHIM_NCU_MODE', 'PATCHES'):
+    for key in ('TBO', 'LB', 'MODELS', 'VARIANTS', 'ROUNDS', 'LB_ROUNDS', 'STEPS', 'DRYRUN', 'LLAMA', 'TAG', 'SHIM_NCU_MODE', 'PATCHES', 'PPL_TEXT', 'GGML_CUDA_DISABLE_MMVH', 'GGML_CUDA_FORCE_MMVH'):
         env.pop(key, None)
     env['LLAMA'] = str(tmp / 'absent-llama')
     out = Path(env['OUT'])
@@ -65,37 +65,97 @@ with tempfile.TemporaryDirectory(prefix=f'p100-{kind}-') as tmp:
         require('env.txt', 'ncu: no GP100')
         require('run.log', 'done:')
     elif kind == 'patches':
-        env.update(DRYRUN='1', STEPS='micro build test perf lb', ROUNDS='2', LB_ROUNDS='2',
-                   VARIANTS='upstream conv conv8', MODELS='/FAKE/model.gguf',
+        env.update(DRYRUN='1', ROUNDS='2', LB_ROUNDS='2',
+                   MODELS='/FAKE/model.gguf /FAKE/second.gguf', PPL_TEXT='/FAKE/wiki.txt',
+                   GGML_CUDA_DISABLE_MMVH='0',  # presence-checked; enabled arm must unset it
                    WORK=str(tmp / 'must-not-exist'), LLAMA_SRC=str(tmp / 'absent-llama'))
-        run('bench/patches/run.sh')
-        assert not Path(env['WORK']).exists(), 'dry run created a worktree/build directory'
-        require('env.txt', 'FAKE')
-        summary = require('summary.md', 'FAKE fixture')
-        assert 'analyze tbo failed' not in summary and 'analyze lb failed' not in summary
-        assert 'type_K=f16' in summary and 'type_K=q8_0' in summary and 'type_K=q4_0' in summary
-        assert '## llama-bench' in summary
-        variants = ('upstream', 'conv', 'conv8')
-        for v in variants:
-            require(f'{v}.fa-vbias-test-CUDA0.txt', '16/16 passed')
-            for op in ('fa', 'mulmat'):
-                require(f'{v}.{op}-test-CUDA0.txt', 'passed')
-            for r in (1, 2):
-                sql = require(f'{v}.perf.r{r}.sql', '-- FAKE')
-                assert sql.count('INSERT INTO') == 144
-                rows = [json.loads(line) for line in require(f'{v}.model.kv.r{r}.jsonl').splitlines()]
-                assert {(row['type_k'], row['type_v']) for row in rows} == set(itertools.product(('f16', 'q8_0', 'q4_0'), repeat=2))
-        calls = [json.loads(line) for line in Path(env['SHIM_CALL_LOG']).read_text().splitlines()]
-        assert [c['tool'] for c in calls] == ['tbo'] * 15 + ['lb'] * 6
-        assert all(c['opts']['-b'] == 'CUDA0' for c in calls if c['tool'] == 'tbo')
-        assert [c['mode'] for c in calls[:9]] == ['test'] * 9
-        assert [c['opts'].get('-p') for c in calls[:9]] == [None, 'v_bias', None] * 3
-        log = require('run.log', 'skipping microbench')
-        assert log.count('apply ' + str(root / 'third_party/patches/0003-tests-biased-V-flash-attention-cases.patch')) == 3
-        for pattern in (r'kernel perf (\w+) round (\d+)', r'llama-bench kv model (\w+) round (\d+)'):
-            assert re.findall(pattern, log) == [(v, str(r)) for r in (1, 2) for v in variants]
-        assert log.count('gpu[sm,mem,temp,power,throttle]: FAKE') == 12
+        patch_lists = dict(upstream=(3,), conv=(1, 3), conv8=(1, 2, 3),
+                           flush=(1, 2, 3, 4), mmvh=(1, 2, 3, 5), all=(1, 2, 3, 4, 5))
+        def check(variants, rounds, lb_rounds, models, fa_perf):
+            run('bench/patches/run.sh')
+            assert not Path(env['WORK']).exists(), 'dry run created a worktree/build directory'
+            assert not Path(env['LLAMA_SRC']).exists(), 'dry run accessed a checkout'
+            require('env.txt', 'variants: ' + ' '.join(variants))
+            summary = require('summary.md', 'FAKE fixture')
+            assert 'analyze tbo failed' not in summary and 'analyze lb failed' not in summary
+            assert '## MUL_MAT timing' in summary and 'type_a=q5_K' in summary and 'type_a=q6_K' in summary
+            assert ('## Kernel timing' in summary) == fa_perf
+            if fa_perf:
+                assert all('type_K=' + t in summary for t in ('f16', 'q8_0', 'q4_0'))
+            arms = tuple(a for v in variants for a in ((v, v + '-nommvh') if 5 in patch_lists[v] else (v,)))
+            expected = []
+            def call(tool, mode, arm, **opts):
+                expected.append((tool, mode, opts, '1' if arm.endswith('-nommvh') else None))
+            for v in variants:
+                for op, tag in (('FLASH_ATTN_EXT', 'fa'), ('MUL_MAT', 'mulmat')):
+                    require(f'{v}.{tag}-test-CUDA0.txt', 'passed')
+                    call('tbo', 'test', v, **{'-o': op, '-b': 'CUDA0'})
+                    if tag == 'fa':
+                        require(f'{v}.fa-vbias-test-CUDA0.txt', '16/16 passed')
+                        call('tbo', 'test', v, **{'-o': op, '-b': 'CUDA0', '-p': 'v_bias'})
+                if 5 in patch_lists[v]:
+                    require(f'{v}-nommvh.mulmat-test-CUDA0.txt', 'passed')
+                    call('tbo', 'test', v + '-nommvh', **{'-o': 'MUL_MAT', '-b': 'CUDA0'})
+            for r in range(1, rounds + 1):
+                if fa_perf:
+                    for v in variants:
+                        assert require(f'{v}.perf.r{r}.sql', '-- FAKE').count('INSERT INTO') == 144
+                        call('tbo', 'perf', v, **{'-o': 'FLASH_ATTN_EXT', '-b': 'CUDA0', '--output': 'sql'})
+                for arm in arms:
+                    assert require(f'{arm}.mmperf.r{r}.sql', '-- FAKE').count('INSERT INTO') == 40
+                    call('tbo', 'perf', arm, **{'-o': 'MUL_MAT', '-b': 'CUDA0', '--output': 'sql'})
+            for model in models:
+                for r in range(1, lb_rounds + 1):
+                    for arm in arms:
+                        for test, depth, prompt, gen in (('kv', 16384, 8, 64), ('tg128-d0', 0, 0, 128), ('tg128-d4096', 4096, 0, 128)):
+                            rows = [json.loads(line) for line in require(f'{arm}.{model}.{test}.r{r}.jsonl').splitlines()]
+                            assert {(row['n_prompt'], row['n_gen'], row['n_depth']) for row in rows} == {(prompt, gen, depth)}
+                            types = set(itertools.product(('f16', 'q8_0', 'q4_0'), repeat=2)) if test == 'kv' else {('f16', 'f16')}
+                            assert {(row['type_k'], row['type_v']) for row in rows} == types
+                            call('lb', None, arm, **{'-m': f'/FAKE/{model}.gguf', '-p': str(prompt), '-n': str(gen), '-d': str(depth)})
+                for arm in arms:
+                    require(f'{arm}.{model}.ppl.txt', 'FAKE Final estimate: PPL = 10.0000 +/- 0.1000')
+                    assert f'- {arm} ({arm}.{model}.ppl.txt):' in summary
+                    call('ppl', None, arm, **{'-m': f'/FAKE/{model}.gguf', '-f': '/FAKE/wiki.txt', '-c': '512', '--chunks': '32'})
+                for test in ('kv', 'tg128-d0', 'tg128-d4096'):
+                    assert f'## llama-bench {model} {test}' in summary
+            calls = [json.loads(line) for line in Path(env['SHIM_CALL_LOG']).read_text().splitlines()]
+            assert len(calls) == len(expected), (len(calls), len(expected))
+            # Every invocation and env state, in order: variant interleaving repeats
+            # each round, and -nommvh uses the same executable as its enabled arm.
+            for actual, (tool, mode, opts, disabled) in zip(calls, expected):
+                assert (actual['tool'], actual.get('mode'), actual['disable_mmvh']) == (tool, mode, disabled), (actual, tool, mode, disabled)
+                assert all(actual['opts'].get(k) == value for k, value in opts.items()), (actual, opts)
+                if tool == 'tbo' and mode == 'test':
+                    assert actual['opts'].get('-p') == opts.get('-p')
+            log = require('run.log', 'DRYRUN command: env -u GGML_CUDA_DISABLE_MMVH GGML_CUDA_DISABLE_MMVH=1')
+            applied = re.findall(r'DRYRUN: git -C .*?/([^/ ]+) apply .*?/(000[1-5])-[^\n]+', log)
+            assert applied == [(v, f'{ordinal:04d}') for v in variants for ordinal in patch_lists[v]], applied
+            assert log.count('--target test-backend-ops llama-bench llama-perplexity') == len(variants)
+            assert re.findall(r'MUL_MAT perf ([\w-]+) round (\d+)', log) == [(a, str(r)) for r in range(1, rounds + 1) for a in arms]
+            commands = [line for line in log.splitlines() if 'DRYRUN command:' in line]
+            # The regex argument is shell-escaped; look at calls for its full semantics
+            # (the backend shim checks every positive and negative filter control).
+            assert sum('perf -o MUL_MAT' in line for line in commands) == len(arms) * rounds
+            assert sum(' -p 0 -n 128 -d ' in line for line in commands) == len(arms) * lb_rounds * len(models) * 2
+            assert sum(' --chunks 32 ' in line for line in commands) == len(arms) * len(models)
+            assert summary.count('FAKE Final estimate: PPL = 10.0000 +/- 0.1000') == len(arms) * len(models)
+        # Defaults (including all default steps) are part of the public runner contract.
+        check(('upstream', 'conv8', 'flush', 'mmvh'), 2, 2, ('model', 'second'), True)
+        # All six explicit lists, including the 0004+0005 combination, and mmperf
+        # independent of FA perf. Keep this run isolated from the defaults run.
+        env.update(OUT=str(tmp / 'explicit'), SHIM_CALL_LOG=str(tmp / 'explicit-calls.jsonl'),
+                   VARIANTS='upstream conv conv8 flush mmvh all', STEPS='build test mmperf lb ppl',
+                   MODELS='/FAKE/model.gguf', ROUNDS='1', LB_ROUNDS='1')
+        out = Path(env['OUT'])
+        check(('upstream', 'conv', 'conv8', 'flush', 'mmvh', 'all'), 1, 1, ('model',), False)
+        # PPL stays optional: either missing input must skip without calling a shim.
+        for missing in ('PPL_TEXT', 'MODELS'):
+            skip_env = dict(env, OUT=str(tmp / f'skip-{missing}'), STEPS='ppl')
+            skip_env.pop(missing)
+            subprocess.run(['bash', str(root / 'bench/patches/run.sh')], cwd=root, env=skip_env, check=True)
+            assert 'ppl skipped: set PPL_TEXT and MODELS' in (Path(skip_env['OUT']) / 'run.log').read_text()
     else:
         raise AssertionError(f'unknown dry-run kind: {kind}')
-print(f'{kind}: FAKE plumbing checks passed; temporary results removed')
+print(f'{kind}: FAKE {"A/B " if kind == "patches" else ""}plumbing checks passed; temporary results removed')
 PY

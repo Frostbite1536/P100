@@ -86,6 +86,9 @@ if(Python3_Interpreter_FOUND)
               ${PROJECT_SOURCE_DIR} ${kind})
     set_tests_properties(${kind}_dryrun PROPERTIES TIMEOUT 60)
   endforeach()
+  # Includes default day-one variants/steps, all six patch lists and MMVH arms.
+  set_tests_properties(patches_dryrun PROPERTIES
+    PASS_REGULAR_EXPRESSION "patches: FAKE A/B plumbing checks passed")
 endif()
 
 # Decode predictions and compile-only llama.cpp dot-product SASS fixtures.

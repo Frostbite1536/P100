@@ -1,0 +1,19 @@
+#!/bin/bash
+# FAKE end-to-end fixture; model and text paths are labels and are never opened.
+set -euo pipefail
+exec "${PYTHON:-python3}" - "$@" <<'PY'
+import json
+import os
+import sys
+
+args = sys.argv[1:]
+assert len(args) % 2 == 0
+opts = dict(zip(args[::2], args[1::2]))
+assert set(opts) == {'-m', '-f', '-c', '--chunks', '-ngl', '-fa'}
+assert (opts['-c'], opts['--chunks'], opts['-ngl'], opts['-fa']) == ('512', '32', '99', 'on')
+with open(os.environ['SHIM_CALL_LOG'], 'a') as f:
+    f.write(json.dumps(dict(tool='ppl', opts=opts,
+                           disable_mmvh=os.environ.get('GGML_CUDA_DISABLE_MMVH'))) + '\n')
+print('FAKE perplexity fixture: no model, text or GPU accessed')
+print('FAKE Final estimate: PPL = 10.0000 +/- 0.1000 (synthetic fixture only)')
+PY
