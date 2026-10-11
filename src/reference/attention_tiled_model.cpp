@@ -54,6 +54,8 @@ void attention_tiled_model(const AttnParams& p, const TiledModelConfig& cfg, con
     std::string why;
     if (!validate(p, &why)) throw std::invalid_argument(why);
     if (cfg.br <= 0 || cfg.bc <= 0) throw std::invalid_argument("br and bc must be positive");
+    if (cfg.kv_parallel_blocks < 1 || cfg.o_accum_np < 1)
+        throw std::invalid_argument("KV parallel blocks and O accumulator count must be positive");
     const int qk_modes = static_cast<int>(cfg.qk_accum_fp16) + static_cast<int>(cfg.qk_products_fp16) +
                          static_cast<int>(cfg.qk_half2_chain > 0);
     if (qk_modes > 1) throw std::invalid_argument("QK accumulation modes are mutually exclusive");
@@ -61,9 +63,12 @@ void attention_tiled_model(const AttnParams& p, const TiledModelConfig& cfg, con
     const float neg_inf = -std::numeric_limits<float>::infinity();
     const float scale = p.effective_scale();
     const int block_rows = std::min(cfg.br, p.seq_q);
-    std::vector<float> m(block_rows), l(block_rows);
-    std::vector<float> acc(static_cast<std::size_t>(block_rows) * p.d_v);
-    std::vector<float> tile_acc(p.d_v);
+    const std::size_t states = static_cast<std::size_t>(block_rows) * cfg.kv_parallel_blocks;
+    const std::size_t row_stride = static_cast<std::size_t>(cfg.o_accum_np) * p.d_v;
+    std::vector<float> m(states), l(states);
+    std::vector<float> acc(states * row_stride);
+    std::vector<float> tile_acc(row_stride);
+    std::vector<float> part_scales(cfg.kv_parallel_blocks);
     std::vector<float> prepared_q(static_cast<std::size_t>(block_rows) * p.d_qk);
     const bool prepare_q = cfg.qk_scale_in_q || cfg.qk_q_prescale != 1.0f;
     std::vector<float> logits(std::min(cfg.bc, p.seq_kv));
@@ -88,10 +93,12 @@ void attention_tiled_model(const AttnParams& p, const TiledModelConfig& cfg, con
                     }
                 }
                 for (int jb = 0; jb < p.seq_kv;) {
+                    const int part = (jb / cfg.bc) % cfg.kv_parallel_blocks;
                     const int nc = std::min(cfg.bc, p.seq_kv - jb);
                     // Even the last query row in this block cannot see this tile.
                     if (p.causal && jb > ib + nr - 1 + (p.seq_kv - p.seq_q)) break;
                     for (int r = 0; r < nr; ++r) {
+                        const std::size_t state = static_cast<std::size_t>(part) * block_rows + r;
                         const int i = ib + r;
                         if (p.causal && jb > i + (p.seq_kv - p.seq_q)) continue;
                         const std::size_t row = q_base + i;
@@ -134,14 +141,14 @@ void attention_tiled_model(const AttnParams& p, const TiledModelConfig& cfg, con
                             logits[c] = x;
                             tile_max = std::max(tile_max, x);
                         }
-                        const float m_new = std::max(m[r], tile_max + cfg.kq_max_offset);
+                        const float m_new = std::max(m[state], tile_max + cfg.kq_max_offset);
                         if (m_new == neg_inf) continue;  // No visible key yet; avoid -inf - -inf.
-                        const float alpha = m[r] == neg_inf ? 0.0f : std::exp(m[r] - m_new);
+                        const float alpha = m[state] == neg_inf ? 0.0f : std::exp(m[state] - m_new);
                         float tile_sum = 0.0f;
-                        float* row_acc = acc.data() + static_cast<std::size_t>(r) * p.d_v;
+                        float* row_acc = acc.data() + state * row_stride;
                         if (cfg.o_accum_fp16) {
                             const float half_alpha = round_to_fp16(alpha);
-                            for (int d = 0; d < p.d_v; ++d)
+                            for (std::size_t d = 0; d < row_stride; ++d)
                                 row_acc[d] = round_to_fp16(static_cast<double>(row_acc[d]) * half_alpha);
                         } else {
                             std::fill(tile_acc.begin(), tile_acc.end(), 0.0f);
@@ -151,29 +158,61 @@ void attention_tiled_model(const AttnParams& p, const TiledModelConfig& cfg, con
                             if (cfg.l_from_unrounded_p) tile_sum += weight;
                             if (cfg.p_fp16) weight = round_to_fp16(weight);
                             if (!cfg.l_from_unrounded_p) tile_sum += weight;
+                            const std::size_t lane = static_cast<std::size_t>(c % cfg.o_accum_np) * p.d_v;
                             const float* value = v + (kv_base + jb + c) * p.d_v;
                             if (cfg.o_accum_fp16) {
                                 for (int d = 0; d < p.d_v; ++d)
-                                    row_acc[d] = round_to_fp16(static_cast<double>(weight) * value[d] + row_acc[d]);
+                                    row_acc[lane + d] = round_to_fp16(static_cast<double>(weight) * value[d] + row_acc[lane + d]);
                             } else {
-                                for (int d = 0; d < p.d_v; ++d) tile_acc[d] += weight * value[d];
+                                for (int d = 0; d < p.d_v; ++d) tile_acc[lane + d] += weight * value[d];
                             }
                         }
                         if (!cfg.o_accum_fp16)
-                            for (int d = 0; d < p.d_v; ++d) row_acc[d] = row_acc[d] * alpha + tile_acc[d];
-                        l[r] = l[r] * alpha + tile_sum;
-                        m[r] = m_new;
+                            for (std::size_t d = 0; d < row_stride; ++d) row_acc[d] = row_acc[d] * alpha + tile_acc[d];
+                        l[state] = l[state] * alpha + tile_sum;
+                        m[state] = m_new;
                     }
                     jb += nc;
                 }
                 for (int r = 0; r < nr; ++r) {
                     const std::size_t row = q_base + ib + r;
+                    float global_max = neg_inf;
+                    for (int part = 0; part < cfg.kv_parallel_blocks; ++part) {
+                        const std::size_t state = static_cast<std::size_t>(part) * block_rows + r;
+                        global_max = std::max(global_max, m[state]);
+                        // fattn-tile.cuh:1021-1048: add warp partials in order,
+                        // rounding each addition in the accumulator precision.
+                        float* partial = acc.data() + state * row_stride;
+                        for (int lane = 1; lane < cfg.o_accum_np; ++lane) {
+                            for (int d = 0; d < p.d_v; ++d) {
+                                const float sum = partial[d] + partial[static_cast<std::size_t>(lane) * p.d_v + d];
+                                partial[d] = cfg.o_accum_fp16 ? round_to_fp16(sum) : sum;
+                            }
+                        }
+                    }
+                    // fattn-common.cuh:963-977: unnormalised FP32 parts,
+                    // rebased to their common maximum, then one division.
+                    float denominator = 0.0f;
+                    for (int part = 0; part < cfg.kv_parallel_blocks; ++part) {
+                        const std::size_t state = static_cast<std::size_t>(part) * block_rows + r;
+                        part_scales[part] = l[state] == 0.0f ? 0.0f
+                            : (cfg.kv_parallel_blocks == 1 ? 1.0f : std::exp(m[state] - global_max));
+                        denominator += part_scales[part] * l[state];
+                    }
                     for (int d = 0; d < p.d_v; ++d) {
-                        float value = l[r] == 0.0f ? 0.0f : acc[static_cast<std::size_t>(r) * p.d_v + d] / l[r];
+                        float numerator = 0.0f;
+                        for (int part = 0; part < cfg.kv_parallel_blocks; ++part) {
+                            const std::size_t state = static_cast<std::size_t>(part) * block_rows + r;
+                            if (l[state] == 0.0f) continue;
+                            numerator += part_scales[part] * acc[state * row_stride + d];
+                        }
+                        // Preserve the original single-part expression, including signed zero.
+                        if (cfg.kv_parallel_blocks == 1) numerator = acc[static_cast<std::size_t>(r) * row_stride + d];
+                        float value = denominator == 0.0f ? 0.0f : numerator / denominator;
                         if (cfg.o_fp16_out) value = round_to_fp16(value);
                         o[row * p.d_v + d] = value;
                     }
-                    if (lse) lse[row] = l[r] == 0.0f ? neg_inf : m[r] + std::log(l[r]);
+                    if (lse) lse[row] = denominator == 0.0f ? neg_inf : global_max + std::log(denominator);
                 }
                 ib += nr;
             }

@@ -65,6 +65,8 @@ struct TiledModelConfig {
     float kq_max_offset = 0.0f;  // running max = max(previous, tile_max + offset)
     bool l_from_unrounded_p = false;  // sum FP32 P before optional FP16 rounding
     bool o_accum_fp16 = false;  // FP16 tile rescale and per-key fused P*V updates
+    int kv_parallel_blocks = 1;  // KV tile t belongs to part t % kv_parallel_blocks
+    int o_accum_np = 1;          // key j within a tile belongs to accumulator j % o_accum_np
 };
 
 void attention_tiled_model(const AttnParams& p, const TiledModelConfig& cfg, const float* q, const float* k,

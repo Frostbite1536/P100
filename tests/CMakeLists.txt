@@ -1,4 +1,4 @@
-foreach(name test_fp16 test_reference test_tiled_model error_budget test_tiled_model_sm60 error_budget_sm60)
+foreach(name test_fp16 test_reference test_tiled_model error_budget test_tiled_model_sm60 error_budget_sm60 test_tiled_model_split error_budget_split)
   add_executable(${name} ${name}.cpp)
   target_link_libraries(${name} PRIVATE p100_ref)
 endforeach()
@@ -9,6 +9,9 @@ endforeach()
 foreach(case matrix masked rounding validation)
   add_test(NAME tiled_${case} COMMAND test_tiled_model ${case})
 endforeach()
+add_test(NAME test_tiled_model_split COMMAND test_tiled_model_split)
+target_compile_definitions(error_budget_split PRIVATE P100_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
+add_test(NAME error_budget_split COMMAND error_budget_split)
 add_test(NAME error_budget COMMAND error_budget)
 add_test(NAME test_tiled_model_sm60 COMMAND test_tiled_model_sm60)
 # The full Release run exceeds 120 s; --long includes the 32768-key shapes.
@@ -99,4 +102,10 @@ if(Python3_Interpreter_FOUND)
               ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/decode_model_check.py --sass)
     set_tests_properties(vecdot_sass PROPERTIES TIMEOUT 180)
   endif()
+endif()
+
+if(Python3_Interpreter_FOUND)
+  add_test(NAME fa_split_table
+    COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/bin/fa-split.py --table --check
+            ${PROJECT_SOURCE_DIR}/docs/research/fa-split-sm60-sm70-2026-10-10.csv)
 endif()
