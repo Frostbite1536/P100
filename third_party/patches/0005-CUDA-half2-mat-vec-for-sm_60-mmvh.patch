@@ -1,0 +1,440 @@
+From 19c30f1fa14e9b0c2a795d58ff3706e6bdbe3a26 Mon Sep 17 00:00:00 2001
+From: Codex <codex@openai.com>
+Date: Sat, 10 Oct 2026 20:19:51 -0500
+Subject: [PATCH] CUDA: half2 mat-vec for sm_60 (MMVH)
+
+Pascal sm_60 emulates the integer dot product used by MMVQ. The H1
+pre-hardware design measured 3.9-5.5 ALU instructions per weight per
+column for the affected upstream paths. The h2 prototype unpacks once
+for all columns: 2.63-2.78 at B=1 and 1.07-1.19 at B=8. Its CPU model
+found median error normalized by weight and activation norms of
+2.2e-6 to 7.7e-6, versus 2.6e-5 to 2.3e-4 for q8_1. These are static
+counts and CPU evidence, not P100 performance or GPU FP16 correctness.
+
+Port the block-scaled h16 pre-pass and CHAIN=16 half2 dot product for
+q4_0, q8_0 and q4_K at batch 1 through 8. Use 128-bit loads for eight
+halves instead of the prototype's 32-bit loads, which accounted for
+about 40% of instructions at batch >= 4. Keep one warp per row and
+expose rows per CTA in one constexpr table. sm_60 static loop and total
+instruction counts tie for 1, 2 and 4 rows, so use one on ties; P100
+launch tuning remains pending. No shared memory is used.
+
+GGML_CUDA_DISABLE_MMVH disables automatic selection. GGML_CUDA_FORCE_MMVH
+forces selection, including the FP32-emulation path on Maxwell sm_52,
+and takes precedence over DISABLE. Both are read once and checked for
+presence, including empty or zero-valued strings. Automatic selection
+uses the specified cc >= 600 && cc < 610 range, contiguous F32 src1,
+and the three supported weight types at batch <= 8.
+
+Exclude non-contiguous activations, MUL_MAT_ID (ids), and every fusion
+request; those retain MMVQ. Share one eligibility helper between the
+MMVQ entry and graph fusion gate. This trades gate/up/GLU fusion for
+the intended faster mat-vec and must be measured on the P100.
+
+The eval suite already covers q4_0/q8_0 at k=4096 for n=1,8 and q4_K
+for n=1..8. Add only the 36 missing (type,k,n) combinations for k=4096
+and 14336. Keep the existing MUL_MAT NMSE threshold unchanged.
+
+Applies at bench/LLAMA_COMMIT after 0001 and 0002; independent of 0003
+and 0004. Maxwell correctness and all P100 GPU checks remain pending.
+
+Assisted-by: Codex
+---
+ ggml/src/ggml-cuda/ggml-cuda.cu |   5 +
+ ggml/src/ggml-cuda/mmvh.cu      | 297 ++++++++++++++++++++++++++++++++
+ ggml/src/ggml-cuda/mmvh.cuh     |   8 +
+ ggml/src/ggml-cuda/mmvq.cu      |   7 +
+ tests/test-backend-ops.cpp      |  12 ++
+ 5 files changed, 329 insertions(+)
+ create mode 100644 ggml/src/ggml-cuda/mmvh.cu
+ create mode 100644 ggml/src/ggml-cuda/mmvh.cuh
+
+diff --git a/ggml/src/ggml-cuda/ggml-cuda.cu b/ggml/src/ggml-cuda/ggml-cuda.cu
+index 957908f65..3a66b984a 100644
+--- a/ggml/src/ggml-cuda/ggml-cuda.cu
++++ b/ggml/src/ggml-cuda/ggml-cuda.cu
+@@ -33,6 +33,7 @@
+ #include "ggml-cuda/mmq.cuh"
+ #include "ggml-cuda/mmvf.cuh"
+ #include "ggml-cuda/mmvq.cuh"
++#include "ggml-cuda/mmvh.cuh"
+ #include "ggml-cuda/moe-weighted-reduction.cuh"
+ #include "ggml-cuda/norm.cuh"
+ #include "ggml-cuda/opt-step-adamw.cuh"
+@@ -1836,6 +1837,10 @@ static bool ggml_cuda_should_fuse_mul_mat_vec_q(const ggml_tensor * tensor) {
+ 
+     // fusion is not universally faster on Pascal
+     const int cc = ggml_cuda_info().devices[ggml_cuda_get_device()].cc;
++    const ggml_tensor * ids = tensor->op == GGML_OP_MUL_MAT_ID ? tensor->src[2] : nullptr;
++    if (ggml_cuda_should_use_mmvh(src0, src1, ids, nullptr, cc)) {
++        return false;
++    }
+     if (cc <= GGML_CUDA_CC_PASCAL) {
+         return false;
+     }
+diff --git a/ggml/src/ggml-cuda/mmvh.cu b/ggml/src/ggml-cuda/mmvh.cu
+new file mode 100644
+index 000000000..8a5f6e5ba
+--- /dev/null
++++ b/ggml/src/ggml-cuda/mmvh.cu
+@@ -0,0 +1,297 @@
++#include "mmvh.cuh"
++
++#include <climits>
++#include <cstdlib>
++
++namespace {
++
++__device__ __forceinline__ half2 bits_half2(unsigned u) {
++    return *reinterpret_cast<const half2 *>(&u);
++}
++
++__device__ __forceinline__ unsigned mask_or(unsigned w, unsigned m, unsigned c) {
++#ifndef FAST_FP16_AVAILABLE
++    return (w & m) | c;
++#else
++    // (w & m) | c: truth table (0xf0 & 0xcc) | 0xaa = 0xea. CUDA 12.8 otherwise emits two LOP32I instructions.
++    unsigned result;
++    asm("lop3.b32 %0, %1, %2, %3, 0xea;" : "=r"(result) : "r"(w), "r"(m), "r"(c));
++    return result;
++#endif
++}
++
++#ifndef FAST_FP16_AVAILABLE
++// Maxwell checks layout with FP32 arithmetic; stored activations still round to FP16.
++using Pair = float2;
++__device__ __forceinline__ Pair pair_bits(unsigned u) { return __half22float2(bits_half2(u)); }
++__device__ __forceinline__ Pair zero_pair() { return make_float2(0, 0); }
++__device__ __forceinline__ Pair pair_sub(Pair a, float b) { return make_float2(a.x-b, a.y-b); }
++__device__ __forceinline__ Pair pair_fma(Pair a, Pair b, Pair c) {
++    return make_float2(fmaf(a.x, b.x, c.x), fmaf(a.y, b.y, c.y));
++}
++__device__ __forceinline__ float pair_sum(Pair a) { return a.x+a.y; }
++#else
++using Pair = half2;
++__device__ __forceinline__ Pair pair_bits(unsigned u) { return bits_half2(u); }
++__device__ __forceinline__ Pair zero_pair() { return __float2half2_rn(0); }
++__device__ __forceinline__ Pair pair_sub(Pair a, float b) { return __hsub2(a, __float2half2_rn(b)); }
++__device__ __forceinline__ Pair pair_fma(Pair a, Pair b, Pair c) { return __hfma2(a, b, c); }
++__device__ __forceinline__ float pair_sum(Pair a) {
++    const float2 v = __half22float2(a);
++    return v.x+v.y;
++}
++#endif
++
++// GGUF rows can start at a two-byte boundary (18/34-byte block strides).
++__device__ __forceinline__ unsigned word_b2(const void * p) {
++    const auto * h = static_cast<const unsigned short *>(p);
++    return unsigned(h[0]) | (unsigned(h[1]) << 16);
++}
++
++__device__ __forceinline__ void scale_min(const block_q4_K & b, int j, int & s, int & m) {
++    // Same six-bit packing as get_scale_min_k4 in dequantize.cuh.
++    if (j < 4) {
++        s = b.scales[j] & 63;
++        m = b.scales[j+4] & 63;
++    } else {
++        s = (b.scales[j+4] & 15) | ((b.scales[j-4] >> 6) << 4);
++        m = (b.scales[j+4] >> 4) | ((b.scales[j] >> 6) << 4);
++    }
++}
++
++__device__ __forceinline__ void unpack(const block_q4_0 & b, int, Pair * q, float & d, float & m) {
++    d = __half2float(b.d);
++    m = 0;
++#pragma unroll
++    for (int i = 0; i < 4; ++i) {
++        const unsigned w = word_b2(b.qs+4*i), v = w >> 8;
++        q[2*i]   = pair_sub(pair_bits(mask_or(w, 0x000f000fU, 0x64006400U)), 1032);
++        q[2*i+1] = pair_sub(pair_bits(mask_or(v, 0x000f000fU, 0x64006400U)), 1032);
++        q[8+2*i] = pair_sub(pair_bits(mask_or(w, 0x00f000f0U, 0x54005400U)), 72);
++        q[9+2*i] = pair_sub(pair_bits(mask_or(v, 0x00f000f0U, 0x54005400U)), 72);
++    }
++}
++
++__device__ __forceinline__ void unpack(const block_q8_0 & b, int, Pair * q, float & d, float & m) {
++    d = __half2float(b.d);
++    m = 0;
++#pragma unroll
++    for (int i = 0; i < 8; ++i) {
++        const unsigned u = word_b2(b.qs+4*i) ^ 0x80808080U;
++        // Put bytes 0,2 (and 1,3) in the mantissas with 0x64 exponent bytes.
++        q[2*i]   = pair_sub(pair_bits(__byte_perm(u, 0x64646464U, 0x4240)), 1152);
++        q[2*i+1] = pair_sub(pair_bits(__byte_perm(u, 0x64646464U, 0x4341)), 1152);
++    }
++}
++
++__device__ __forceinline__ void unpack(const block_q4_K & b, int sub, Pair * q, float & d, float & m) {
++    int sc, mn;
++    scale_min(b, sub, sc, mn);
++    d = __fmul_rn(__half2float(__low2half(b.dm)), float(sc));
++    m = __fmul_rn(__half2float(__high2half(b.dm)), float(mn));
++#pragma unroll
++    for (int i = 0; i < 8; ++i) {
++        const unsigned w = word_b2(b.qs+(sub/2)*32+4*i), v = w >> 8;
++        if (sub%2 == 0) {
++            q[2*i]   = pair_sub(pair_bits(mask_or(w, 0x000f000fU, 0x64006400U)), 1024);
++            q[2*i+1] = pair_sub(pair_bits(mask_or(v, 0x000f000fU, 0x64006400U)), 1024);
++        } else {
++            q[2*i]   = pair_sub(pair_bits(mask_or(w, 0x00f000f0U, 0x54005400U)), 64);
++            q[2*i+1] = pair_sub(pair_bits(mask_or(v, 0x00f000f0U, 0x54005400U)), 64);
++        }
++    }
++}
++
++static __global__ void mmvh_h16_prepass(const float * x, half * h, float2 * meta, int k, int64_t columns) {
++    const int lane = threadIdx.x, block = blockIdx.x;
++    const int64_t i = int64_t(block)*32+lane;
++    for (int64_t col = blockIdx.y; col < columns; col += gridDim.y) {
++        const float v = x[col*k+i];
++        float s = fabsf(v);
++#pragma unroll
++        for (int off = 16; off; off /= 2) {
++            s = fmaxf(s, __shfl_xor_sync(0xffffffff, s, off));
++        }
++        const half hv = __float2half_rn(s == 0 ? 0.f : __fdiv_rn(v, s));
++        const int perm = (lane & ~3) | ((lane & 1) << 1) | ((lane & 2) >> 1);
++        h[col*k+int64_t(block)*32+perm] = hv;
++        float sum = __half2float(hv);
++#pragma unroll
++        for (int off = 16; off; off /= 2) {
++            sum += __shfl_xor_sync(0xffffffff, sum, off);
++        }
++        if (lane == 0) {
++            meta[col*(k/32)+block] = make_float2(s, sum);
++        }
++    }
++}
++
++template<class W> struct Layout {
++    static constexpr int size = 32;
++    static constexpr bool has_min = false;
++};
++template<> struct Layout<block_q4_K> {
++    static constexpr int size = 256;
++    static constexpr bool has_min = true;
++};
++
++// Unpack once for all B columns; meta.sum corrects Q4_K's minimum once per sub-block.
++template<class W, int B, int CHAIN>
++__device__ __forceinline__ void block_dot(const W & w, const half * h, const float2 * meta, int k, int block, float * result) {
++#pragma unroll
++    for (int sub = 0; sub < Layout<W>::size/32; ++sub) {
++        Pair q[16];
++        float d, m;
++        unpack(w, sub, q, d, m);
++        const int ab = block*(Layout<W>::size/32)+sub;
++        Pair acc[B];
++#pragma unroll
++        for (int c = 0; c < B; ++c) {
++            acc[c] = zero_pair();
++        }
++        static_assert(CHAIN == 16, "one FP32 flush per 32 weights");
++#pragma unroll
++        for (int tile = 0; tile < 4; ++tile) {
++#pragma unroll
++            for (int c = 0; c < B; ++c) {
++                const half * ptr = h + int64_t(c)*k + int64_t(ab)*32 + tile*8;
++                uint4 v;
++                // The pool and every 32-half block are 16-byte aligned. Keep all four words in one load.
++                asm("ld.global.v4.u32 {%0, %1, %2, %3}, [%4];"
++                    : "=r"(v.x), "=r"(v.y), "=r"(v.z), "=r"(v.w) : "l"(ptr));
++                acc[c] = pair_fma(q[tile*4+0], pair_bits(v.x), acc[c]);
++                acc[c] = pair_fma(q[tile*4+1], pair_bits(v.y), acc[c]);
++                acc[c] = pair_fma(q[tile*4+2], pair_bits(v.z), acc[c]);
++                acc[c] = pair_fma(q[tile*4+3], pair_bits(v.w), acc[c]);
++            }
++        }
++#pragma unroll
++        for (int c = 0; c < B; ++c) {
++            const float ds = __fmul_rn(d, meta[int64_t(c)*(k/32)+ab].x);
++            result[c] = __fadd_rn(result[c], __fmul_rn(pair_sum(acc[c]), ds));
++        }
++        if constexpr (Layout<W>::has_min) {
++#pragma unroll
++            for (int c = 0; c < B; ++c) {
++                const float2 md = meta[int64_t(c)*(k/32)+ab];
++                result[c] = __fadd_rn(result[c], -__fmul_rn(__fmul_rn(m, md.x), md.y));
++            }
++        }
++    }
++}
++
++// Columns 1..8; rows Q4_0, Q8_0, Q4_K. sm_60 loop and total instruction counts tie for 1/2/4 rows per CTA.
++// Keep one row (one warp per row) on ties; P100 tuning is pending.
++static constexpr int mmvh_rows_per_block[3][8] = {
++    {1, 1, 1, 1, 1, 1, 1, 1},
++    {1, 1, 1, 1, 1, 1, 1, 1},
++    {1, 1, 1, 1, 1, 1, 1, 1},
++};
++
++struct mmvh_strides {
++    size_t row_x, channel_x, sample_x;
++    size_t col_dst, channel_dst, sample_dst;
++    int channel_ratio, sample_ratio, channels_y;
++};
++
++template<class W, int B, int rows_per_block>
++static __global__ void mmvh_mat_vec(const char * w, const half * h, const float2 * meta,
++                                   float * output, int k, int rows, mmvh_strides strides) {
++    const int lane = threadIdx.x;
++    const int row = blockIdx.x*rows_per_block + threadIdx.y;
++    if (row >= rows) {
++        return;
++    }
++    const int channel = blockIdx.y;
++    const int sample = blockIdx.z;
++    const W * wr = reinterpret_cast<const W *>(w + size_t(row)*strides.row_x +
++        size_t(channel/strides.channel_ratio)*strides.channel_x + size_t(sample/strides.sample_ratio)*strides.sample_x);
++    const int64_t column = (int64_t(sample)*strides.channels_y + channel)*B;
++    h += column*k;
++    meta += column*(k/32);
++    output += size_t(channel)*strides.channel_dst + size_t(sample)*strides.sample_dst;
++    float sum[B] = {};
++    for (int block = lane; block < k/Layout<W>::size; block += 32) {
++        block_dot<W, B, 16>(wr[block], h, meta, k, block, sum);
++    }
++#pragma unroll
++    for (int c = 0; c < B; ++c) {
++#pragma unroll
++        for (int off = 16; off; off /= 2) {
++            sum[c] += __shfl_down_sync(0xffffffff, sum[c], off);
++        }
++        if (lane == 0) {
++            output[size_t(c)*strides.col_dst + row] = sum[c];
++        }
++    }
++}
++
++template<class W, int type_index, int B>
++static void mmvh_launch(const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst,
++                        const half * h, const float2 * meta, cudaStream_t stream) {
++    constexpr int rows_per_block = mmvh_rows_per_block[type_index][B-1];
++    const dim3 grid((src0->ne[1]+rows_per_block-1)/rows_per_block, dst->ne[2], dst->ne[3]);
++    const dim3 threads(32, rows_per_block);
++    const mmvh_strides strides = {
++        src0->nb[1], src0->nb[2], src0->nb[3],
++        dst->nb[1]/sizeof(float), dst->nb[2]/sizeof(float), dst->nb[3]/sizeof(float),
++        int(dst->ne[2]/src0->ne[2]), int(dst->ne[3]/src0->ne[3]), int(src1->ne[2]),
++    };
++    mmvh_mat_vec<W, B, rows_per_block><<<grid, threads, 0, stream>>>(
++        static_cast<const char *>(src0->data), h, meta, static_cast<float *>(dst->data), src0->ne[0], src0->ne[1], strides);
++}
++
++template<class W, int type_index>
++static void mmvh_launch_batch(const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst,
++                              const half * h, const float2 * meta, cudaStream_t stream) {
++    switch (src1->ne[1]) {
++#define MMVH_BATCH(B) case B: mmvh_launch<W, type_index, B>(src0, src1, dst, h, meta, stream); break
++        MMVH_BATCH(1);
++        MMVH_BATCH(2);
++        MMVH_BATCH(3);
++        MMVH_BATCH(4);
++        MMVH_BATCH(5);
++        MMVH_BATCH(6);
++        MMVH_BATCH(7);
++        MMVH_BATCH(8);
++#undef MMVH_BATCH
++        default: GGML_ABORT("unsupported MMVH batch");
++    }
++}
++
++} // namespace
++
++bool ggml_cuda_should_use_mmvh(const ggml_tensor * src0, const ggml_tensor * src1, const ggml_tensor * ids,
++                               const ggml_cuda_mm_fusion_args_host * fusion, int cc) {
++    static const bool disable = getenv("GGML_CUDA_DISABLE_MMVH") != nullptr;
++    static const bool force   = getenv("GGML_CUDA_FORCE_MMVH") != nullptr;
++    return ids == nullptr && fusion == nullptr &&
++        (src0->type == GGML_TYPE_Q4_0 || src0->type == GGML_TYPE_Q8_0 || src0->type == GGML_TYPE_Q4_K) &&
++        src1->type == GGML_TYPE_F32 && ggml_is_contiguous(src1) && src1->ne[1] >= 1 && src1->ne[1] <= 8 &&
++        (force || (cc >= 600 && cc < 610 && !disable));
++}
++
++void ggml_cuda_mul_mat_vec_h(ggml_backend_cuda_context & ctx, const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst) {
++    GGML_ASSERT(src0->nb[0] == ggml_type_size(src0->type));
++    GGML_ASSERT(src1->type == GGML_TYPE_F32 && ggml_is_contiguous(src1));
++    GGML_ASSERT(dst->type == GGML_TYPE_F32 && dst->nb[0] == sizeof(float));
++    GGML_ASSERT(src0->ne[0] == src1->ne[0] && src0->ne[0] % ggml_blck_size(src0->type) == 0);
++    GGML_ASSERT(src0->ne[0] <= INT_MAX && src0->ne[1] <= INT_MAX);
++    GGML_ASSERT(src1->ne[2] == dst->ne[2] && src1->ne[3] == dst->ne[3]);
++    const int k = src0->ne[0];
++    const int64_t columns = ggml_nrows(src1);
++    GGML_ASSERT(dst->ne[2] <= 65535 && dst->ne[3] <= 65535);
++    cudaStream_t stream = ctx.stream();
++    ggml_cuda_pool_alloc<half> h(ctx.pool(), ggml_nelements(src1));
++    ggml_cuda_pool_alloc<float2> meta(ctx.pool(), ggml_nelements(src1)/32);
++    mmvh_h16_prepass<<<dim3(k/32, std::min<int64_t>(columns, 65535)), 32, 0, stream>>>(
++        static_cast<const float *>(src1->data), h.get(), meta.get(), k, columns);
++    CUDA_CHECK(cudaGetLastError());
++    switch (src0->type) {
++        case GGML_TYPE_Q4_0: mmvh_launch_batch<block_q4_0, 0>(src0, src1, dst, h.get(), meta.get(), stream); break;
++        case GGML_TYPE_Q8_0: mmvh_launch_batch<block_q8_0, 1>(src0, src1, dst, h.get(), meta.get(), stream); break;
++        case GGML_TYPE_Q4_K: mmvh_launch_batch<block_q4_K, 2>(src0, src1, dst, h.get(), meta.get(), stream); break;
++        default: GGML_ABORT("unsupported MMVH type");
++    }
++    CUDA_CHECK(cudaGetLastError());
++}
+diff --git a/ggml/src/ggml-cuda/mmvh.cuh b/ggml/src/ggml-cuda/mmvh.cuh
+new file mode 100644
+index 000000000..9ff7f59f3
+--- /dev/null
++++ b/ggml/src/ggml-cuda/mmvh.cuh
+@@ -0,0 +1,8 @@
++#pragma once
++
++#include "common.cuh"
++
++bool ggml_cuda_should_use_mmvh(const ggml_tensor * src0, const ggml_tensor * src1, const ggml_tensor * ids,
++                               const ggml_cuda_mm_fusion_args_host * fusion, int cc);
++
++void ggml_cuda_mul_mat_vec_h(ggml_backend_cuda_context & ctx, const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst);
+diff --git a/ggml/src/ggml-cuda/mmvq.cu b/ggml/src/ggml-cuda/mmvq.cu
+index 251577d2f..1a8142d93 100644
+--- a/ggml/src/ggml-cuda/mmvq.cu
++++ b/ggml/src/ggml-cuda/mmvq.cu
+@@ -1,4 +1,5 @@
+ #include "mmvq.cuh"
++#include "mmvh.cuh"
+ #include "quantize.cuh"
+ #include "unary.cuh"
+ #include "vecdotq.cuh"
+@@ -1434,6 +1435,12 @@ static void mul_mat_vec_q_switch_type(
+ void ggml_cuda_mul_mat_vec_q(
+         ggml_backend_cuda_context & ctx, const ggml_tensor * src0, const ggml_tensor * src1, const ggml_tensor * ids, ggml_tensor * dst,
+         const ggml_cuda_mm_fusion_args_host * fusion) {
++    const int cc = ggml_cuda_info().devices[ggml_cuda_get_device()].cc;
++    if (ggml_cuda_should_use_mmvh(src0, src1, ids, fusion, cc)) {
++        ggml_cuda_mul_mat_vec_h(ctx, src0, src1, dst);
++        return;
++    }
++
+     GGML_ASSERT(        src1->type == GGML_TYPE_F32);
+     GGML_ASSERT(        dst->type  == GGML_TYPE_F32);
+     GGML_ASSERT(!ids || ids->type  == GGML_TYPE_I32); // Optional, used for batched GGML_MUL_MAT_ID.
+diff --git a/tests/test-backend-ops.cpp b/tests/test-backend-ops.cpp
+index 4e3c6942b..d8f356af6 100644
+--- a/tests/test-backend-ops.cpp
++++ b/tests/test-backend-ops.cpp
+@@ -10657,6 +10657,18 @@ static std::vector<std::unique_ptr<test_case>> make_test_cases_eval() {
+         }
+     }
+ 
++    // MMVH: fill the missing n <= 8 combinations at both decode inner dimensions.
++    for (ggml_type type_a : {GGML_TYPE_Q4_0, GGML_TYPE_Q8_0, GGML_TYPE_Q4_K}) {
++        for (int64_t k : {4096, 14336}) {
++            for (int n = 1; n <= 8; ++n) {
++                if (k == 4096 && (type_a == GGML_TYPE_Q4_K || n == 1 || n == 8)) {
++                    continue; // Covered above in this eval suite.
++                }
++                test_cases.emplace_back(new test_mul_mat(type_a, GGML_TYPE_F32, 129, n, k, {1, 1}, {1, 1}));
++            }
++        }
++    }
++
+     // The SYCL backend picks between one and two output rows per subgroup by row count when there
+     // are two destination columns (Q4_K_MMVQ_ROW_PAIR_MIN_NROWS in ggml-sycl/mmvq.cpp). Cover both
+     // sides of that boundary, including an odd row count above it for the row-pair tail.
+-- 
+2.43.0
+
