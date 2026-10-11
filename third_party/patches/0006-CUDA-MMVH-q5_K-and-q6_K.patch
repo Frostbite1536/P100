@@ -1,0 +1,263 @@
+From 01af3ebe9f83371e6827625dcb8b8086c2708ee2 Mon Sep 17 00:00:00 2001
+From: Codex <codex@openai.com>
+Date: Sat, 10 Oct 2026 23:17:09 -0500
+Subject: [PATCH] CUDA: extend MMVH to q5_K and q6_K
+
+Unpack q5_K fifth bits and q6_K two-bit high fields before half2 bias subtraction. Reuse the six-bit scale/min packing for q5_K; split q6_K into two eight-HFMA2 chains, flushed separately with its signed scales per 16 weights. Keep the existing MMVH paths and environment switches.
+
+Add only the 22 missing eval combinations: q5_K k=14336 n=1..8; q6_K k=4096 n=2..7 and k=14336 n=1..8. Existing test tolerances are unchanged. Maxwell FP32 emulation and P100 GPU validation remain pending.
+
+Assisted-by: Codex
+---
+ ggml/src/ggml-cuda/mmvh.cu | 157 ++++++++++++++++++++++++++++++-------
+ tests/test-backend-ops.cpp |  12 +++
+ 2 files changed, 140 insertions(+), 29 deletions(-)
+
+diff --git a/ggml/src/ggml-cuda/mmvh.cu b/ggml/src/ggml-cuda/mmvh.cu
+index 8a5f6e5ba..7dde841a4 100644
+--- a/ggml/src/ggml-cuda/mmvh.cu
++++ b/ggml/src/ggml-cuda/mmvh.cu
+@@ -48,7 +48,8 @@ __device__ __forceinline__ unsigned word_b2(const void * p) {
+     return unsigned(h[0]) | (unsigned(h[1]) << 16);
+ }
+ 
+-__device__ __forceinline__ void scale_min(const block_q4_K & b, int j, int & s, int & m) {
++template<class W>
++__device__ __forceinline__ void scale_min(const W & b, int j, int & s, int & m) {
+     // Same six-bit packing as get_scale_min_k4 in dequantize.cuh.
+     if (j < 4) {
+         s = b.scales[j] & 63;
+@@ -102,6 +103,55 @@ __device__ __forceinline__ void unpack(const block_q4_K & b, int sub, Pair * q,
+     }
+ }
+ 
++__device__ __forceinline__ void unpack(const block_q5_K & b, int sub, Pair * q, float & d, float & m) {
++    int sc, mn;
++    scale_min(b, sub, sc, mn);
++    d = __fmul_rn(__half2float(__low2half(b.dm)), float(sc));
++    m = __fmul_rn(__half2float(__high2half(b.dm)), float(mn));
++    // ggml-quants.c:1751-1754: bit sub of qh[l] supplies q's fifth bit.
++    // Two mask_or LOP3s insert the high bit and nibble; each uses truth table 0xea (see above).
++#pragma unroll
++    for (int i = 0; i < 8; ++i) {
++        const unsigned w = word_b2(b.qs+(sub/2)*32+4*i), v = w >> 8;
++        const unsigned hi = word_b2(b.qh+4*i) >> sub;
++        if (sub%2 == 0) {
++            const unsigned h0 = mask_or(hi << 4, 0x00100010U, 0x64006400U);
++            const unsigned h1 = mask_or(hi >> 4, 0x00100010U, 0x64006400U);
++            q[2*i]   = pair_sub(pair_bits(mask_or(w, 0x000f000fU, h0)), 1024);
++            q[2*i+1] = pair_sub(pair_bits(mask_or(v, 0x000f000fU, h1)), 1024);
++        } else {
++            const unsigned h0 = mask_or(hi << 8, 0x01000100U, 0x54005400U);
++            const unsigned h1 = mask_or(hi, 0x01000100U, 0x54005400U);
++            q[2*i]   = pair_sub(pair_bits(mask_or(w, 0x00f000f0U, h0)), 64);
++            q[2*i+1] = pair_sub(pair_bits(mask_or(v, 0x00f000f0U, h1)), 64);
++        }
++    }
++}
++
++__device__ __forceinline__ void unpack(const block_q6_K & b, int sub, Pair * q, float & d0, float & d1) {
++    // ggml-quants.c:1953-1966: four 32-weight groups per 128, two scales per group.
++    // Two mask_or LOP3s insert the high bits and nibble; 1056/96 also subtract the signed offset.
++    const float d = __half2float(b.d);
++    d0 = __fmul_rn(d, float(b.scales[2*sub]));
++    d1 = __fmul_rn(d, float(b.scales[2*sub+1]));
++#pragma unroll
++    for (int i = 0; i < 8; ++i) {
++        const unsigned w = word_b2(b.ql+(sub/4)*64+(sub%2)*32+4*i), v = w >> 8;
++        const unsigned hi = word_b2(b.qh+(sub/4)*32+4*i) >> (2*(sub%4));
++        if (sub%4 < 2) {
++            const unsigned h0 = mask_or(hi << 4, 0x00300030U, 0x64006400U);
++            const unsigned h1 = mask_or(hi >> 4, 0x00300030U, 0x64006400U);
++            q[2*i]   = pair_sub(pair_bits(mask_or(w, 0x000f000fU, h0)), 1056);
++            q[2*i+1] = pair_sub(pair_bits(mask_or(v, 0x000f000fU, h1)), 1056);
++        } else {
++            const unsigned h0 = mask_or(hi << 8, 0x03000300U, 0x54005400U);
++            const unsigned h1 = mask_or(hi, 0x03000300U, 0x54005400U);
++            q[2*i]   = pair_sub(pair_bits(mask_or(w, 0x00f000f0U, h0)), 96);
++            q[2*i+1] = pair_sub(pair_bits(mask_or(v, 0x00f000f0U, h1)), 96);
++        }
++    }
++}
++
+ static __global__ void mmvh_h16_prepass(const float * x, half * h, float2 * meta, int k, int64_t columns) {
+     const int lane = threadIdx.x, block = blockIdx.x;
+     const int64_t i = int64_t(block)*32+lane;
+@@ -129,13 +179,25 @@ static __global__ void mmvh_h16_prepass(const float * x, half * h, float2 * meta
+ template<class W> struct Layout {
+     static constexpr int size = 32;
+     static constexpr bool has_min = false;
++    static constexpr bool two_scales = false;
+ };
+ template<> struct Layout<block_q4_K> {
+     static constexpr int size = 256;
+     static constexpr bool has_min = true;
++    static constexpr bool two_scales = false;
++};
++
++template<> struct Layout<block_q5_K> : Layout<block_q4_K> {};
++template<> struct Layout<block_q6_K> {
++    static constexpr int size = 256;
++    static constexpr bool has_min = false;
++    static constexpr bool two_scales = true;
+ };
+ 
+-// Unpack once for all B columns; meta.sum corrects Q4_K's minimum once per sub-block.
++// Unpack once for all B columns; meta.sum corrects K-quant minima once per sub-block.
++// |xhat| <= 1: Q5_K's 16 HFMA2 steps bound each half by 496 (pair sum <= 992).
++// Q6_K's eight steps per scale bound each half by 256 (pair sum <= 512).
++// Integer weights are exact in FP16; both bounds are <= 1024, far below overflow.
+ template<class W, int B, int CHAIN>
+ __device__ __forceinline__ void block_dot(const W & w, const half * h, const float2 * meta, int k, int block, float * result) {
+ #pragma unroll
+@@ -144,45 +206,79 @@ __device__ __forceinline__ void block_dot(const W & w, const half * h, const flo
+         float d, m;
+         unpack(w, sub, q, d, m);
+         const int ab = block*(Layout<W>::size/32)+sub;
+-        Pair acc[B];
++        if constexpr (Layout<W>::two_scales) {
++            static_assert(CHAIN == 16, "split each 32-weight sub-block into two eight-HFMA2 chains");
+ #pragma unroll
+-        for (int c = 0; c < B; ++c) {
+-            acc[c] = zero_pair();
+-        }
+-        static_assert(CHAIN == 16, "one FP32 flush per 32 weights");
++            for (int group = 0; group < 2; ++group) {
++                Pair acc[B];
++#pragma unroll
++                for (int c = 0; c < B; ++c) {
++                    acc[c] = zero_pair();
++                }
++#pragma unroll
++                for (int tile = group*2; tile < group*2+2; ++tile) {
+ #pragma unroll
+-        for (int tile = 0; tile < 4; ++tile) {
++                    for (int c = 0; c < B; ++c) {
++                        const half * ptr = h + int64_t(c)*k + int64_t(ab)*32 + tile*8;
++                        uint4 v;
++                        asm("ld.global.v4.u32 {%0, %1, %2, %3}, [%4];"
++                            : "=r"(v.x), "=r"(v.y), "=r"(v.z), "=r"(v.w) : "l"(ptr));
++                        acc[c] = pair_fma(q[tile*4+0], pair_bits(v.x), acc[c]);
++                        acc[c] = pair_fma(q[tile*4+1], pair_bits(v.y), acc[c]);
++                        acc[c] = pair_fma(q[tile*4+2], pair_bits(v.z), acc[c]);
++                        acc[c] = pair_fma(q[tile*4+3], pair_bits(v.w), acc[c]);
++                    }
++                }
++#pragma unroll
++                for (int c = 0; c < B; ++c) {
++                    // unpack returns the second signed scale through m; Q6_K has no minimum.
++                    const float ds = __fmul_rn(group == 0 ? d : m, meta[int64_t(c)*(k/32)+ab].x);
++                    result[c] = __fadd_rn(result[c], __fmul_rn(pair_sum(acc[c]), ds));
++                }
++            }
++        } else {
++            Pair acc[B];
+ #pragma unroll
+             for (int c = 0; c < B; ++c) {
+-                const half * ptr = h + int64_t(c)*k + int64_t(ab)*32 + tile*8;
+-                uint4 v;
+-                // The pool and every 32-half block are 16-byte aligned. Keep all four words in one load.
+-                asm("ld.global.v4.u32 {%0, %1, %2, %3}, [%4];"
+-                    : "=r"(v.x), "=r"(v.y), "=r"(v.z), "=r"(v.w) : "l"(ptr));
+-                acc[c] = pair_fma(q[tile*4+0], pair_bits(v.x), acc[c]);
+-                acc[c] = pair_fma(q[tile*4+1], pair_bits(v.y), acc[c]);
+-                acc[c] = pair_fma(q[tile*4+2], pair_bits(v.z), acc[c]);
+-                acc[c] = pair_fma(q[tile*4+3], pair_bits(v.w), acc[c]);
++                acc[c] = zero_pair();
+             }
+-        }
++            static_assert(CHAIN == 16, "one FP32 flush per 32 weights");
+ #pragma unroll
+-        for (int c = 0; c < B; ++c) {
+-            const float ds = __fmul_rn(d, meta[int64_t(c)*(k/32)+ab].x);
+-            result[c] = __fadd_rn(result[c], __fmul_rn(pair_sum(acc[c]), ds));
+-        }
+-        if constexpr (Layout<W>::has_min) {
++            for (int tile = 0; tile < 4; ++tile) {
++#pragma unroll
++                for (int c = 0; c < B; ++c) {
++                    const half * ptr = h + int64_t(c)*k + int64_t(ab)*32 + tile*8;
++                    uint4 v;
++                    // The pool and every 32-half block are 16-byte aligned. Keep all four words in one load.
++                    asm("ld.global.v4.u32 {%0, %1, %2, %3}, [%4];"
++                        : "=r"(v.x), "=r"(v.y), "=r"(v.z), "=r"(v.w) : "l"(ptr));
++                    acc[c] = pair_fma(q[tile*4+0], pair_bits(v.x), acc[c]);
++                    acc[c] = pair_fma(q[tile*4+1], pair_bits(v.y), acc[c]);
++                    acc[c] = pair_fma(q[tile*4+2], pair_bits(v.z), acc[c]);
++                    acc[c] = pair_fma(q[tile*4+3], pair_bits(v.w), acc[c]);
++                }
++            }
+ #pragma unroll
+             for (int c = 0; c < B; ++c) {
+-                const float2 md = meta[int64_t(c)*(k/32)+ab];
+-                result[c] = __fadd_rn(result[c], -__fmul_rn(__fmul_rn(m, md.x), md.y));
++                const float ds = __fmul_rn(d, meta[int64_t(c)*(k/32)+ab].x);
++                result[c] = __fadd_rn(result[c], __fmul_rn(pair_sum(acc[c]), ds));
++            }
++            if constexpr (Layout<W>::has_min) {
++#pragma unroll
++                for (int c = 0; c < B; ++c) {
++                    const float2 md = meta[int64_t(c)*(k/32)+ab];
++                    result[c] = __fadd_rn(result[c], -__fmul_rn(__fmul_rn(m, md.x), md.y));
++                }
+             }
+         }
+     }
+ }
+ 
+-// Columns 1..8; rows Q4_0, Q8_0, Q4_K. sm_60 loop and total instruction counts tie for 1/2/4 rows per CTA.
+-// Keep one row (one warp per row) on ties; P100 tuning is pending.
+-static constexpr int mmvh_rows_per_block[3][8] = {
++// Columns 1..8; rows Q4_0, Q8_0, Q4_K, Q5_K, Q6_K. Existing types tied for 1/2/4 rows per CTA.
++// Keep one row (one warp per row); new types use the same default. P100 tuning is pending.
++static constexpr int mmvh_rows_per_block[5][8] = {
++    {1, 1, 1, 1, 1, 1, 1, 1},
++    {1, 1, 1, 1, 1, 1, 1, 1},
+     {1, 1, 1, 1, 1, 1, 1, 1},
+     {1, 1, 1, 1, 1, 1, 1, 1},
+     {1, 1, 1, 1, 1, 1, 1, 1},
+@@ -266,7 +362,8 @@ bool ggml_cuda_should_use_mmvh(const ggml_tensor * src0, const ggml_tensor * src
+     static const bool disable = getenv("GGML_CUDA_DISABLE_MMVH") != nullptr;
+     static const bool force   = getenv("GGML_CUDA_FORCE_MMVH") != nullptr;
+     return ids == nullptr && fusion == nullptr &&
+-        (src0->type == GGML_TYPE_Q4_0 || src0->type == GGML_TYPE_Q8_0 || src0->type == GGML_TYPE_Q4_K) &&
++        (src0->type == GGML_TYPE_Q4_0 || src0->type == GGML_TYPE_Q8_0 || src0->type == GGML_TYPE_Q4_K ||
++         src0->type == GGML_TYPE_Q5_K || src0->type == GGML_TYPE_Q6_K) &&
+         src1->type == GGML_TYPE_F32 && ggml_is_contiguous(src1) && src1->ne[1] >= 1 && src1->ne[1] <= 8 &&
+         (force || (cc >= 600 && cc < 610 && !disable));
+ }
+@@ -291,6 +388,8 @@ void ggml_cuda_mul_mat_vec_h(ggml_backend_cuda_context & ctx, const ggml_tensor
+         case GGML_TYPE_Q4_0: mmvh_launch_batch<block_q4_0, 0>(src0, src1, dst, h.get(), meta.get(), stream); break;
+         case GGML_TYPE_Q8_0: mmvh_launch_batch<block_q8_0, 1>(src0, src1, dst, h.get(), meta.get(), stream); break;
+         case GGML_TYPE_Q4_K: mmvh_launch_batch<block_q4_K, 2>(src0, src1, dst, h.get(), meta.get(), stream); break;
++        case GGML_TYPE_Q5_K: mmvh_launch_batch<block_q5_K, 3>(src0, src1, dst, h.get(), meta.get(), stream); break;
++        case GGML_TYPE_Q6_K: mmvh_launch_batch<block_q6_K, 4>(src0, src1, dst, h.get(), meta.get(), stream); break;
+         default: GGML_ABORT("unsupported MMVH type");
+     }
+     CUDA_CHECK(cudaGetLastError());
+diff --git a/tests/test-backend-ops.cpp b/tests/test-backend-ops.cpp
+index 59b163188..1836869c7 100644
+--- a/tests/test-backend-ops.cpp
++++ b/tests/test-backend-ops.cpp
+@@ -10707,6 +10707,18 @@ static std::vector<std::unique_ptr<test_case>> make_test_cases_eval() {
+         }
+     }
+ 
++    // MMVH Q5_K/Q6_K: add only missing (type, k, n) combinations, retaining the NMSE limit.
++    for (ggml_type type_a : {GGML_TYPE_Q5_K, GGML_TYPE_Q6_K}) {
++        for (int64_t k : {4096, 14336}) {
++            for (int n = 1; n <= 8; ++n) {
++                if (k == 4096 && (type_a == GGML_TYPE_Q5_K || n == 1 || n == 8)) {
++                    continue; // Q5_K n=1..8 and all_types n=1,8 already covered above.
++                }
++                test_cases.emplace_back(new test_mul_mat(type_a, GGML_TYPE_F32, 129, n, k, {1, 1}, {1, 1}));
++            }
++        }
++    }
++
+     // The SYCL backend picks between one and two output rows per subgroup by row count when there
+     // are two destination columns (Q4_K_MMVQ_ROW_PAIR_MIN_NROWS in ggml-sycl/mmvq.cpp). Cover both
+     // sides of that boundary, including an odd row count above it for the row-pair tail.
+-- 
+2.43.0
+

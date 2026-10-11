@@ -70,7 +70,7 @@ with tempfile.TemporaryDirectory(prefix=f'p100-{kind}-') as tmp:
                    GGML_CUDA_DISABLE_MMVH='0',  # presence-checked; enabled arm must unset it
                    WORK=str(tmp / 'must-not-exist'), LLAMA_SRC=str(tmp / 'absent-llama'))
         patch_lists = dict(upstream=(3,), conv=(1, 3), conv8=(1, 2, 3),
-                           flush=(1, 2, 3, 4), mmvh=(1, 2, 3, 5), all=(1, 2, 3, 4, 5))
+                           flush=(1, 2, 3, 4), mmvh=(1, 2, 3, 5, 6), all=(1, 2, 3, 4, 5, 6))
         def check(variants, rounds, lb_rounds, models, fa_perf):
             run('bench/patches/run.sh')
             assert not Path(env['WORK']).exists(), 'dry run created a worktree/build directory'
@@ -129,7 +129,7 @@ with tempfile.TemporaryDirectory(prefix=f'p100-{kind}-') as tmp:
                 if tool == 'tbo' and mode == 'test':
                     assert actual['opts'].get('-p') == opts.get('-p')
             log = require('run.log', 'DRYRUN command: env -u GGML_CUDA_DISABLE_MMVH GGML_CUDA_DISABLE_MMVH=1')
-            applied = re.findall(r'DRYRUN: git -C .*?/([^/ ]+) apply .*?/(000[1-5])-[^\n]+', log)
+            applied = re.findall(r'DRYRUN: git -C .*?/([^/ ]+) apply .*?/(000[1-6])-[^\n]+', log)
             assert applied == [(v, f'{ordinal:04d}') for v in variants for ordinal in patch_lists[v]], applied
             assert log.count('--target test-backend-ops llama-bench llama-perplexity') == len(variants)
             assert re.findall(r'MUL_MAT perf ([\w-]+) round (\d+)', log) == [(a, str(r)) for r in range(1, rounds + 1) for a in arms]
@@ -142,7 +142,7 @@ with tempfile.TemporaryDirectory(prefix=f'p100-{kind}-') as tmp:
             assert summary.count('FAKE Final estimate: PPL = 10.0000 +/- 0.1000') == len(arms) * len(models)
         # Defaults (including all default steps) are part of the public runner contract.
         check(('upstream', 'conv8', 'flush', 'mmvh'), 2, 2, ('model', 'second'), True)
-        # All six explicit lists, including the 0004+0005 combination, and mmperf
+        # All six explicit lists, including the 0004+0005+0006 combination, and mmperf
         # independent of FA perf. Keep this run isolated from the defaults run.
         env.update(OUT=str(tmp / 'explicit'), SHIM_CALL_LOG=str(tmp / 'explicit-calls.jsonl'),
                    VARIANTS='upstream conv conv8 flush mmvh all', STEPS='build test mmperf lb ppl',

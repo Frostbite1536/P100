@@ -7,7 +7,7 @@
 #   DRYRUN=1 OUT=/tmp/patches MODELS=/FAKE/model.gguf PPL_TEXT=/FAKE/wiki.txt bench/patches/run.sh
 #     use bundled FAKE shims; skip worktrees, compilation, model/text access.
 # Variants: upstream=0003; conv=0001,0003; conv8=0001,0002,0003;
-#   flush=0001,0002,0003,0004; mmvh=0001,0002,0003,0005; all=0001-0005.
+#   flush=0001,0002,0003,0004; mmvh=0001,0002,0003,0005,0006; all=0001-0006.
 # Default variants: upstream conv8 flush mmvh. Default steps:
 #   micro (conversion), build, test (full FA, biased-V, MUL_MAT),
 #   perf (FA), mmperf (contiguous F32 MUL_MAT n=1..8), lb (kv and tg128), ppl.
@@ -50,7 +50,7 @@ ver=$(nvcc --version | sed -n 's/.*release \([0-9.]*\),.*/\1/p')
 ordinals_for() {
     case $1 in
         upstream) echo 3 ;; conv) echo '1 3' ;; conv8) echo '1 2 3' ;;
-        flush) echo '1 2 3 4' ;; mmvh) echo '1 2 3 5' ;; all) echo '1 2 3 4 5' ;;
+        flush) echo '1 2 3 4' ;; mmvh) echo '1 2 3 5 6' ;; all) echo '1 2 3 4 5 6' ;;
         *) echo "unknown variant $1" >&2; return 2 ;;
     esac
 }
