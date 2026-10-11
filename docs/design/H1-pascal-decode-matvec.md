@@ -1,6 +1,6 @@
 # H1: decode mat-vec without dp4a (half2 path for sm_60)
 
-Status: design, pre-hardware. Prototype measured statically and on the CPU (`p6`); llama.cpp patch is ticket `p9`.
+Status: pre-hardware. Prototype `p6`; llama.cpp patch `third_party/patches/0005` (`p9`), in the day-one A/B (`p11`).
 Nothing here ran on a P100.
 
 ## Problem
@@ -15,8 +15,8 @@ which sm_60 emulates (`common.cuh:740-746`). Evidence that this makes P100 decod
 - Structure check on the Maxwell M2200 (also no dp4a, same `MMVQ_PARAMETERS_GENERIC` table), `test-backend-ops
   perf -o MUL_MAT`, 74 decode shapes × 3 rounds (p7b): for rows the model calls ALU-bound, measured/predicted
   median 1.08 (fitted issue efficiency 0.93); for bandwidth-bound rows the fitted bandwidth efficiency is 0.62.
-  First run was taken under heavy CPU load (round spread up to 190%); a clean re-run is pending. This tests the
-  model's structure on a sibling architecture, not P100 numbers.
+  A second run gave 0.89 / 0.63; n = 2–4 within about ±30% for every type. Neither host was idle (large spread on
+  some n = 5, 8 rows). This tests the model's structure on a sibling architecture, not P100 numbers.
 
 ## Proposal
 

@@ -17,11 +17,20 @@ every change small enough to upstream or carry as a patch. Background and hypoth
   (model worst case 61% at 32K keys with biased V; real key split not yet modelled); `half2` chains: 2 terms at most.
 - P-4 Decode cost model (H1). ✅ (ticket p4) `bin/decode-model.py` + llama.cpp's real per-type SASS counts:
   predicted ALU-bound at batch 1 for q4_0/q4_K/q5_K/q6_K, every quantised type at batch ≥ 4 (uncalibrated; §1).
-- P-5 Refine the FA model with keys per FP16 accumulator from a trace of llama.cpp's warp/parallel-block split;
-  add a biased-V FLASH_ATTN_EXT case to the Phase 0 kit.
-- Patches `third_party/patches/0001..0002` (volta-fa 0005/0006): check they apply at the pinned commit and
-  build for sm_60 (`-DCMAKE_CUDA_ARCHITECTURES=60` with the local nvcc); MUL_MAT + FA correctness on the
-  laptop's Maxwell GPU.
+- P-5 FA key split traced (`bin/fa-split.py`) and modelled. ✅ (p5) Decode: 21 parallel blocks, ≤ 2.6% (biased V,
+  32K); 512-token prefill: 3 blocks, 33%. VEC is FP32 on NVIDIA. `pre-hardware-findings-2-2026-10-10.md` §1.
+- P-6 half2 decode mat-vec prototype (H1): CPU numerics, static SASS, Maxwell layout check. ✅ (p6/p6b)
+  Design: `docs/design/H1-pascal-decode-matvec.md`.
+- P-7 Patches 0001–0002 built for sm_60 and checked on Maxwell (no new failures); patch 0003 biased-V FA cases +
+  FP32 CPU reference (llama.cpp's reference accumulated in FP16); decode model checked on Maxwell (issue
+  efficiency 0.89–0.93) with `bin/calibrate-decode.py`. ✅ (p7a/p7b/p7c)
+- P-8 Patch 0004: flush the TILE FP16 output accumulator to FP32 per KV tile (model worst 0.17%). ✅ (p8)
+- P-9 Patch 0005 `mmvh`: half2 decode mat-vec in llama.cpp (q4_0/q8_0/q4_K, batch 1–8). ✅ (p9)
+- P-10 `test_p2p` setup race fixed. ✅ (p10)
+- P-11 Day-one A/B kit: variants `upstream conv8 flush mmvh`, MUL_MAT perf n = 1..8, tg128, perplexity. ✅ (p11)
+
+Still open before hardware: mmvh for q5_K/q6_K (the other half of Q4_K_M files); upstream-quality write-ups are
+the owner's (llama.cpp forbids AI-written PR text).
 
 **Excludes**: any performance claim.
 
@@ -30,7 +39,8 @@ every change small enough to upstream or carry as a patch. Background and hypoth
 Variant: PCIe 16 GB (ordered). Record `nvidia-smi -q`, `nvidia-smi topo -m`, host CPU and PCIe layout in
 `bench/BASELINE.md`. Then, in this order:
 
-1. Full `test-backend-ops test -o FLASH_ATTN_EXT` and `-o MUL_MAT` on each GPU (crash classes, 3.).
+0. `bench/patches/run.sh` (all variants, one session): answers 0004 (biased-V fixed? cost?) and 0005 (H1 Accept-if).
+1. Full `test-backend-ops test -o FLASH_ATTN_EXT` (incl. biased-V cases) and `-o MUL_MAT` on each GPU.
 2. **H1**: `test-backend-ops perf -o MUL_MAT` at batch 1–8 per weight type: achieved GB/s vs HBM roofline;
    calibrate `bin/decode-model.py` (`--bw-eff`, `--issue-eff`) and record where it was wrong.
 3. **H2/H3**: FA perf by head dim; llama-bench FA on/off × depth 0–32K.
