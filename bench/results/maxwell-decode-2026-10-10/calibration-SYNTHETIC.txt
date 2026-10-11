@@ -1,0 +1,20 @@
+P100 pcie16 prediction: backend=CUDA0 variant=pcie16 arch=sm_60 commit=synthetic selected=4 rounds=1
+time_us is already per run; weight_GB/s counts weights once per batch; decimal GB.
+Repeated identical cases within a round use their median; spread is (max-min)/median across rounds.
+INITIAL bw_eff=1 issue_eff=1
+type m k n measured_us/run weight_GB/s bound t_bw_us t_alu_us predicted_us ratio min_us max_us spread_pct rounds
+q4_0 32 256 1 5.000000 0.921600 alu 0.006295 0.007401 0.007401 675.629630 5.000000 5.000000 0.000000 1
+q4_1 32 256 1 2.000000 2.560000 bw 0.006995 0.006578 0.006995 285.937500 2.000000 2.000000 0.000000 1
+q8_0 32 256 1 2.000000 4.352000 bw 0.011891 0.006852 0.011891 168.198529 2.000000 2.000000 0.000000 1
+q8_0 32 256 4 10.000000 0.870400 alu 0.011891 0.027409 0.027409 364.840000 10.000000 10.000000 0.000000 1
+FIT bw_eff: initial_bound=bw rows=2 median(measured/predicted)=227.068015
+FIT issue_eff: initial_bound=alu rows=2 median(measured/predicted)=520.234815
+FITTED bw_eff=0.00440396681 issue_eff=0.00192220892
+type m k n measured_us/run weight_GB/s bound t_bw_us t_alu_us predicted_us ratio min_us max_us spread_pct rounds
+q4_0 32 256 1 5.000000 0.921600 alu 1.429412 3.850000 3.850000 1.298701 5.000000 5.000000 0.000000 1
+q4_1 32 256 1 2.000000 2.560000 alu 1.588235 3.422222 3.422222 0.584416 2.000000 2.000000 0.000000 1
+q8_0 32 256 1 2.000000 4.352000 alu 2.700000 3.564815 3.564815 0.561039 2.000000 2.000000 0.000000 1
+q8_0 32 256 4 10.000000 0.870400 alu 2.700000 14.259259 14.259259 0.701299 10.000000 10.000000 0.000000 1
+BOUND CHANGES 2
+q4_1 m=32 k=256 n=1: bw -> alu
+q8_0 m=32 k=256 n=1: bw -> alu

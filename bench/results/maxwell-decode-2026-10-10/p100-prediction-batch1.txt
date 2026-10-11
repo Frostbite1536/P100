@@ -1,0 +1,18 @@
+PREDICTIONS: datasheet peaks, uncalibrated; ignores activations, KV cache, attention and launch overhead
+model=llama3.1-8b weights=7,504,658,432 batch=1 variant=pcie16 HBM=732 GB/s issue=4669.952000 Glane-instructions/s bw_eff=1 issue_eff=1
+All mat-vec weights use the row's one type; embeddings excluded.
+Weights read once per batch step; bytes/token = bytes/step / batch; tokens/s = batch / step time.
+sm_61 counts use the P100 issue rate as a reference: "if dp4a existed".
+f16: bandwidth-only ceiling; no measured ALU count.
+Times in ms; step = max(bw, alu). GB uses decimal units.
+type      GB/step  GB/token     bw_ms   alu60_ms bound60  step60_ms   tok60/s   alu61_ms bound61  step61_ms   tok61/s
+q4_0     4.221370  4.221370  5.766899   6.779572     alu   6.779572   147.502   2.109200      bw   5.766899   173.403
+q4_1     4.690412  4.690412  6.407666   6.026287      bw   6.407666   156.063   2.058981      bw   6.407666   156.063
+q5_0     5.159453  5.159453  7.048433  11.500164     alu  11.500164    86.955   5.524096      bw   7.048433   141.876
+q5_1     5.628494  5.628494  7.689199  11.198849     alu  11.198849    89.295   5.524096      bw   7.689199   130.053
+q8_0     7.973700  7.973700 10.893032   6.277382      bw  10.893032    91.802   1.807886      bw  10.893032    91.802
+q4_K     4.221370  4.221370  5.766899   8.819722     alu   8.819722   113.382   4.268620      bw   5.766899   173.403
+q5_K     5.159453  5.159453  7.048433   9.937095     alu   9.937095   100.633   5.122344      bw   7.048433   141.876
+q6_K     6.156165  6.156165  8.410062  12.328778     alu  12.328778    81.111   6.133002      bw   8.410062   118.905
+iq4_xs   3.986850  3.986850  5.446516   9.045707     alu   9.045707   110.550   4.369058      bw   5.446516   183.604
+f16     15.009317 15.009317 20.504531        n/a bw-only  20.504531    48.770        n/a bw-only  20.504531    48.770

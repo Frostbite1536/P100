@@ -1,0 +1,45 @@
+
+==============NVSMI LOG==============
+
+Timestamp                                              : Sat Oct 10 19:42:09 2026
+Driver Version                                         : 580.178.04
+CUDA Version                                           : 13.0
+
+Attached GPUs                                          : 1
+GPU 00000000:01:00.0
+    Clocks
+        Graphics                                       : 135 MHz
+        SM                                             : 135 MHz
+        Memory                                         : 405 MHz
+        Video                                          : 405 MHz
+    Applications Clocks
+        Graphics                                       : 696 MHz
+        Memory                                         : 2754 MHz
+    Default Applications Clocks
+        Graphics                                       : 696 MHz
+        Memory                                         : 2754 MHz
+    Deferred Clocks
+        Memory                                         : N/A
+    Max Clocks
+        Graphics                                       : 1038 MHz
+        SM                                             : 1038 MHz
+        Memory                                         : 2754 MHz
+        Video                                          : 851 MHz
+    Max Customer Boost Clocks
+        Graphics                                       : N/A
+    SM Clock Samples
+        Duration                                       : 20700.69 sec
+        Number of Samples                              : 100
+        Max                                            : 696 MHz
+        Min                                            : 135 MHz
+        Avg                                            : 693 MHz
+    Memory Clock Samples
+        Duration                                       : 20700.69 sec
+        Number of Samples                              : 100
+        Max                                            : 2754 MHz
+        Min                                            : 405 MHz
+        Avg                                            : 2737 MHz
+    Clock Policy
+        Auto Boost                                     : N/A
+        Auto Boost Default                             : N/A
+

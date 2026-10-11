@@ -1,0 +1,63 @@
+Test project /home/p51/Github/worktrees/p100-p7b-decode-maxwell/build
+      Start  1: fp16
+ 1/29 Test  #1: fp16 .............................   Passed    0.01 sec
+      Start  2: reference_tiny
+ 2/29 Test  #2: reference_tiny ...................   Passed    0.00 sec
+      Start  3: reference_uniform
+ 3/29 Test  #3: reference_uniform ................   Passed    0.01 sec
+      Start  4: reference_double
+ 4/29 Test  #4: reference_double .................   Passed    0.01 sec
+      Start  5: reference_gqa
+ 5/29 Test  #5: reference_gqa ....................   Passed    0.02 sec
+      Start  6: reference_causal
+ 6/29 Test  #6: reference_causal .................   Passed    0.01 sec
+      Start  7: reference_masked
+ 7/29 Test  #7: reference_masked .................   Passed    0.01 sec
+      Start  8: reference_softcap
+ 8/29 Test  #8: reference_softcap ................   Passed    0.01 sec
+      Start  9: reference_large
+ 9/29 Test  #9: reference_large ..................   Passed    0.01 sec
+      Start 10: reference_validation
+10/29 Test #10: reference_validation .............   Passed    0.01 sec
+      Start 11: tiled_matrix
+11/29 Test #11: tiled_matrix .....................   Passed   30.17 sec
+      Start 12: tiled_masked
+12/29 Test #12: tiled_masked .....................   Passed    0.00 sec
+      Start 13: tiled_rounding
+13/29 Test #13: tiled_rounding ...................   Passed    0.01 sec
+      Start 14: tiled_validation
+14/29 Test #14: tiled_validation .................   Passed    0.01 sec
+      Start 15: error_budget
+15/29 Test #15: error_budget .....................   Passed   51.07 sec
+      Start 16: test_tiled_model_sm60
+16/29 Test #16: test_tiled_model_sm60 ............   Passed    0.05 sec
+      Start 17: error_budget_sm60
+17/29 Test #17: error_budget_sm60 ................   Passed   51.75 sec
+      Start 18: sm60_report_ok
+18/29 Test #18: sm60_report_ok ...................   Passed    0.24 sec
+      Start 19: sm60_report_spill
+19/29 Test #19: sm60_report_spill ................   Passed    4.58 sec
+      Start 20: sm60_report_smem
+20/29 Test #20: sm60_report_smem .................   Passed    0.40 sec
+      Start 21: forbidden_dp4a
+21/29 Test #21: forbidden_dp4a ...................   Passed    0.04 sec
+      Start 22: forbidden_wmma
+22/29 Test #22: forbidden_wmma ...................   Passed    0.04 sec
+      Start 23: analyze_tbo
+23/29 Test #23: analyze_tbo ......................   Passed    0.26 sec
+      Start 24: analyze_lb_rounds
+24/29 Test #24: analyze_lb_rounds ................   Passed    0.25 sec
+      Start 25: phase0_dryrun
+25/29 Test #25: phase0_dryrun ....................   Passed    2.09 sec
+      Start 26: patches_dryrun
+26/29 Test #26: patches_dryrun ...................   Passed    4.25 sec
+      Start 27: decode_model
+27/29 Test #27: decode_model .....................   Passed    1.83 sec
+      Start 28: calibrate_decode
+28/29 Test #28: calibrate_decode .................   Passed    0.45 sec
+      Start 29: vecdot_sass
+29/29 Test #29: vecdot_sass ......................   Passed   26.43 sec
+
+100% tests passed out of 29
+
+Total Test time (real) = 174.00 sec

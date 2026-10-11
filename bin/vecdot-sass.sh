@@ -5,7 +5,10 @@ export PATH=/home/p51/Github/P100/.venv/bin:$PATH
 root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 nvcc=${P100_NVCC:-/home/p51/Github/P100/tools/cuda-12.8/bin/nvcc}
 cuobjdump=$(dirname "$nvcc")/cuobjdump
-llama=/home/p51/Github/P100/third_party/llama.cpp
+llama=$root/third_party/llama.cpp
+if [ ! -d "$llama/ggml" ]; then
+    llama=/home/p51/Github/P100/third_party/llama.cpp
+fi
 output=${1:-$root/docs/research/vecdot-sass-2026-10-10.csv}
 if [ "$#" -gt 1 ]; then
     echo "usage: $0 [output.csv]" >&2
@@ -14,7 +17,7 @@ fi
 mkdir -p "$root/build"
 work=$(mktemp -d "$root/build/vecdot-sass.XXXXXX")
 trap 'rm -rf "$work"' EXIT
-for arch in sm_60 sm_61; do
+for arch in sm_60 sm_61 sm_52; do
     "$nvcc" -O3 -std=c++17 -cubin -arch="$arch" \
         -I "$llama/ggml/include" -I "$llama/ggml/src" \
         -I "$llama/ggml/src/ggml-cuda" \
@@ -33,7 +36,7 @@ types = dict(q4_0=32, q4_1=32, q5_0=32, q5_1=32, q8_0=32,
 control = set("S2R EXIT BRA RET NOP BAR SYNC SSY PBK BRK CAL".split())
 instruction = re.compile(r"^\s*/\*[0-9a-fA-F]+\*/\s+(?:@!?P\d+\s+)?([A-Z][A-Z0-9]*)(?:\.[A-Z0-9.]+)?\s*")
 rows = []
-for arch in ("sm_60", "sm_61"):
+for arch in ("sm_60", "sm_61", "sm_52"):
     counts = {}
     current = None
     for line in (pathlib.Path(sys.argv[1]) / (arch + ".sass")).read_text().splitlines():
