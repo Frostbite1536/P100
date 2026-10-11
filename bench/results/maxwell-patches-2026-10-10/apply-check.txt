@@ -1,0 +1,4 @@
+clean pin: 79e2e74eb11022c1ba2e438df7f0ca2d4c10f8b6
+0001-CUDA-fewer-idle-threads-when-converting-short-non-co.patch: git apply --check exit=0
+0002-CUDA-vectorized-dequantization-of-non-contiguous-q4_.patch: git apply --check exit=0
+0003-tests-biased-V-flash-attention-cases.patch: git apply --check exit=0

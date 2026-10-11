@@ -1,0 +1,14 @@
+-- The CXX compiler identification is GNU 13.3.0
+-- Detecting CXX compiler ABI info
+-- Detecting CXX compiler ABI info - done
+-- Check for working CXX compiler: /usr/bin/c++ - skipped
+-- Detecting CXX compile features
+-- Detecting CXX compile features - done
+-- Looking for a CUDA compiler
+-- Looking for a CUDA compiler - NOTFOUND
+-- P100: no CUDA compiler found, building CPU reference and tests only
+-- P100: CUDA runtime unavailable; skipping P2P targets
+-- Found Python3: /home/p51/Github/P100/.venv/bin/python3.12 (found version "3.12.3") found components: Interpreter
+-- Configuring done (1.5s)
+-- Generating done (0.0s)
+-- Build files have been written to: /home/p51/Github/worktrees/p100-p7a-patches-biasv/build

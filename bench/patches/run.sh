@@ -5,7 +5,7 @@
 #   STEPS="test perf lb" bench/patches/run.sh   reuse prepared builds
 #   DRYRUN=1 OUT=/tmp/patches STEPS="test perf lb" bench/patches/run.sh
 #     use test-backend-ops / llama-bench from PATH; skip worktrees and compilation.
-# Variants: upstream (none), conv (0001), conv8 (0001-0002).
+# Variants: upstream (0003), conv (0001+0003), conv8 (0001-0003).
 # Results: bench/results/patches-<stamp>-<host>/; summary.md uses analyze.py tbo/lb.
 set -euo pipefail
 cd "$(dirname "$0")/../.." || exit 2
@@ -47,6 +47,9 @@ patches_for() {
         [ ${#files[@]} = 1 ] && [ -f "${files[0]}" ] || { echo "missing or ambiguous patch $k" >&2; return 2; }
         printf '%s\n' "${files[@]}"
     done
+    local tests=("$PATCHES"/0003-*.patch)
+    [ ${#tests[@]} = 1 ] && [ -f "${tests[0]}" ] || { echo "missing or ambiguous patch 3" >&2; return 2; }
+    printf '%s\n' "${tests[@]}"
 }
 for v in $VARIANTS; do patches_for "$v" > /dev/null; done
 
@@ -109,7 +112,10 @@ for v in $VARIANTS; do
                cmake --build "$src/build" --target test-backend-ops llama-bench >> "$OUT/$v.build.log" 2>&1; }; then
             log "  BUILD FAILED for $v"; tail -15 "$OUT/$v.build.log" | tee -a "$OUT/run.log"; continue
         fi
-    elif has build; then log "DRYRUN: skipping worktree preparation and build for $v"; fi
+    elif has build; then
+        while IFS= read -r p; do log "DRYRUN: git -C $src apply $p"; done < <(patches_for "$v")
+        log "DRYRUN: skipping worktree preparation and build for $v"
+    fi
     if { has test || has perf; } && [ ! -x "$(tbo_for "$v")" ]; then log "missing test-backend-ops for $v; run STEPS=build first"; exit 1; fi
     if has lb && [ ! -x "$(lb_for "$v")" ]; then log "missing llama-bench for $v; run STEPS=build first"; exit 1; fi
     built+=("$v")
@@ -119,6 +125,11 @@ for v in $VARIANTS; do
             log "correctness $v (full $op CUDA0)"
             "$(tbo_for "$v")" test -b CUDA0 -o "$op" > "$OUT/$v.$tag-test-CUDA0.txt" 2>&1 && rc=0 || rc=$?
             log "  rc=$rc  OK=$(grep -c 'OK' "$OUT/$v.$tag-test-CUDA0.txt" || true)  FAIL=$(grep -c 'FAIL' "$OUT/$v.$tag-test-CUDA0.txt" || true)"
+            if [ "$op" = FLASH_ATTN_EXT ]; then
+                log "biased-V correctness: $(tbo_for "$v") test -b CUDA0 -o FLASH_ATTN_EXT -p v_bias"
+                "$(tbo_for "$v")" test -b CUDA0 -o FLASH_ATTN_EXT -p v_bias > "$OUT/$v.fa-vbias-test-CUDA0.txt" 2>&1 && rc=0 || rc=$?
+                log "  rc=$rc  OK=$(grep -c 'OK' "$OUT/$v.fa-vbias-test-CUDA0.txt" || true)  FAIL=$(grep -c 'FAIL' "$OUT/$v.fa-vbias-test-CUDA0.txt" || true)"
+            fi
         done
     fi
 done

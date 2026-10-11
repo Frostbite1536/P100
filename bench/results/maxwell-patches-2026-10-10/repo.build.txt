@@ -1,0 +1,15 @@
+[1/15] Building CXX object tests/CMakeFiles/test_reference.dir/test_reference.cpp.o
+[2/15] Building CXX object tests/CMakeFiles/test_fp16.dir/test_fp16.cpp.o
+[3/15] Building CXX object src/reference/CMakeFiles/p100_ref.dir/attention_tiled_model.cpp.o
+[4/15] Building CXX object src/reference/CMakeFiles/p100_ref.dir/attention_reference.cpp.o
+[5/15] Linking CXX static library src/reference/libp100_ref.a
+[6/15] Building CXX object tests/CMakeFiles/error_budget.dir/error_budget.cpp.o
+[7/15] Linking CXX executable tests/test_reference
+[8/15] Linking CXX executable tests/error_budget
+[9/15] Linking CXX executable tests/test_fp16
+[10/15] Building CXX object tests/CMakeFiles/test_tiled_model.dir/test_tiled_model.cpp.o
+[11/15] Linking CXX executable tests/test_tiled_model
+[12/15] Building CXX object tests/CMakeFiles/test_tiled_model_sm60.dir/test_tiled_model_sm60.cpp.o
+[13/15] Linking CXX executable tests/test_tiled_model_sm60
+[14/15] Building CXX object tests/CMakeFiles/error_budget_sm60.dir/error_budget_sm60.cpp.o
+[15/15] Linking CXX executable tests/error_budget_sm60

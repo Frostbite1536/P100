@@ -1,0 +1,17 @@
+[1/16] Building C object ggml/src/CMakeFiles/ggml-base.dir/ggml.c.o
+[2/16] Linking CXX shared library bin/libggml-base.so.0.26.0
+[3/16] Creating library symlink bin/libggml-base.so.0 bin/libggml-base.so
+[4/16] Linking CXX shared library bin/libggml-cpu.so.0.26.0
+[5/16] Creating library symlink bin/libggml-cpu.so.0 bin/libggml-cpu.so
+[6/16] Building CUDA object ggml/src/ggml-cuda/CMakeFiles/ggml-cuda.dir/convert.cu.o
+nvcc warning : Support for offline compilation for architectures prior to '<compute/sm/lto>_75' will be removed in a future release (Use -Wno-deprecated-gpu-targets to suppress warning).
+[7/16] Linking CUDA shared library bin/libggml-cuda.so.0.26.0
+[8/16] Creating library symlink bin/libggml-cuda.so.0 bin/libggml-cuda.so
+[9/16] Linking CXX shared library bin/libggml.so.0.26.0
+[10/16] Creating library symlink bin/libggml.so.0 bin/libggml.so
+[11/16] Linking CXX shared library bin/libllama.so.0.6.0
+[12/16] Creating library symlink bin/libllama.so.0 bin/libllama.so
+[13/16] Linking CXX shared library bin/libllama-common.so.0.6.0
+[14/16] Creating library symlink bin/libllama-common.so.0 bin/libllama-common.so
+[15/16] Building CXX object tests/CMakeFiles/test-backend-ops.dir/test-backend-ops.cpp.o
+[16/16] Linking CXX executable bin/test-backend-ops

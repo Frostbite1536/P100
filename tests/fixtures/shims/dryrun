@@ -19,7 +19,7 @@ with tempfile.TemporaryDirectory(prefix=f'p100-{kind}-') as tmp:
     env = dict(os.environ, PATH=f'{shims}:{os.environ["PATH"]}', OUT=str(tmp / 'results'),
                SHIM_CALL_LOG=str(tmp / 'calls.jsonl'), FORCE='0')
     # Isolate the tests from inherited benchmark settings and local model lists.
-    for key in ('TBO', 'LB', 'MODELS', 'VARIANTS', 'ROUNDS', 'LB_ROUNDS', 'STEPS', 'DRYRUN', 'LLAMA', 'TAG', 'SHIM_NCU_MODE'):
+    for key in ('TBO', 'LB', 'MODELS', 'VARIANTS', 'ROUNDS', 'LB_ROUNDS', 'STEPS', 'DRYRUN', 'LLAMA', 'TAG', 'SHIM_NCU_MODE', 'PATCHES'):
         env.pop(key, None)
     env['LLAMA'] = str(tmp / 'absent-llama')
     out = Path(env['OUT'])
@@ -33,13 +33,14 @@ with tempfile.TemporaryDirectory(prefix=f'p100-{kind}-') as tmp:
             assert needle in text, f'{name}: missing {needle!r}'
         return text
     if kind == 'phase0':
-        env.update(STEPS='env support test perf', TBO=str(shims / 'test-backend-ops'), LB=str(shims / 'llama-bench'))
+        env.update(DRYRUN='1', STEPS='env build support test perf', TBO=str(shims / 'test-backend-ops'), LB=str(shims / 'llama-bench'))
         run('bench/phase0.sh')
         text = require('env.txt', 'GP100')
         assert 'FAKE topology' in text and 'FAKE peer-read topology' in text
         require('nvidia-smi-q.txt', 'FAKE')
         for dev in ('CUDA0', 'CUDA1'):
             require(f'fa-support-{dev}.txt', 'FAKE')
+            require(f'fa-vbias-test-{dev}.txt', '16/16 passed')
             for op in ('fa', 'mulmat'):
                 require(f'{op}-test-{dev}.txt', 'passed')
                 require(f'{op}-perf-{dev}.sql', '-- FAKE')
@@ -48,7 +49,15 @@ with tempfile.TemporaryDirectory(prefix=f'p100-{kind}-') as tmp:
         expected = {(mode, op, dev) for dev in ('CUDA0', 'CUDA1')
                     for mode, op in [('support', 'FLASH_ATTN_EXT'), ('test', 'FLASH_ATTN_EXT'),
                                      ('test', 'MUL_MAT'), ('perf', 'FLASH_ATTN_EXT'), ('perf', 'MUL_MAT')]}
-        assert len(calls) == 10
+        assert len(calls) == 12
+        biased = [c for c in calls if c['opts'].get('-p') == 'v_bias']
+        assert len(biased) == 2 and {c['opts']['-b'] for c in biased} == {'CUDA0', 'CUDA1'}
+        for dev in ('CUDA0', 'CUDA1'):
+            tests = [c['opts'].get('-p') for c in calls if c['mode'] == 'test' and c['opts']['-b'] == dev]
+            assert tests == [None, 'v_bias', None]
+        require('run.log', 'apply --check -R')
+        require('run.log', '0003-tests-biased-V-flash-attention-cases.patch')
+        assert not Path(env['LLAMA']).exists()
         assert {(c['mode'], c['opts']['-o'], c['opts']['-b']) for c in calls} == expected
         # A failing optional profiler must leave a useful diagnosis and finish the env step.
         env.update(STEPS='env', SHIM_NCU_MODE='error')
@@ -68,6 +77,7 @@ with tempfile.TemporaryDirectory(prefix=f'p100-{kind}-') as tmp:
         assert '## llama-bench' in summary
         variants = ('upstream', 'conv', 'conv8')
         for v in variants:
+            require(f'{v}.fa-vbias-test-CUDA0.txt', '16/16 passed')
             for op in ('fa', 'mulmat'):
                 require(f'{v}.{op}-test-CUDA0.txt', 'passed')
             for r in (1, 2):
@@ -76,10 +86,12 @@ with tempfile.TemporaryDirectory(prefix=f'p100-{kind}-') as tmp:
                 rows = [json.loads(line) for line in require(f'{v}.model.kv.r{r}.jsonl').splitlines()]
                 assert {(row['type_k'], row['type_v']) for row in rows} == set(itertools.product(('f16', 'q8_0', 'q4_0'), repeat=2))
         calls = [json.loads(line) for line in Path(env['SHIM_CALL_LOG']).read_text().splitlines()]
-        assert [c['tool'] for c in calls] == ['tbo'] * 12 + ['lb'] * 6
+        assert [c['tool'] for c in calls] == ['tbo'] * 15 + ['lb'] * 6
         assert all(c['opts']['-b'] == 'CUDA0' for c in calls if c['tool'] == 'tbo')
-        assert [c['mode'] for c in calls[:6]] == ['test'] * 6
+        assert [c['mode'] for c in calls[:9]] == ['test'] * 9
+        assert [c['opts'].get('-p') for c in calls[:9]] == [None, 'v_bias', None] * 3
         log = require('run.log', 'skipping microbench')
+        assert log.count('apply ' + str(root / 'third_party/patches/0003-tests-biased-V-flash-attention-cases.patch')) == 3
         for pattern in (r'kernel perf (\w+) round (\d+)', r'llama-bench kv model (\w+) round (\d+)'):
             assert re.findall(pattern, log) == [(v, str(r)) for r in (1, 2) for v in variants]
         assert log.count('gpu[sm,mem,temp,power,throttle]: FAKE') == 12

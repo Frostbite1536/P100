@@ -1,0 +1,92 @@
+[
+  {
+    "variant": "upstream",
+    "op": "FLASH_ATTN_EXT",
+    "rc": 0,
+    "passed": 0,
+    "failed": 0,
+    "unsupported": 0,
+    "cuda_present": false
+  },
+  {
+    "variant": "upstream",
+    "op": "MUL_MAT",
+    "rc": 0,
+    "passed": 0,
+    "failed": 0,
+    "unsupported": 0,
+    "cuda_present": false
+  },
+  {
+    "variant": "upstream",
+    "op": "CPY",
+    "rc": 0,
+    "passed": 0,
+    "failed": 0,
+    "unsupported": 0,
+    "cuda_present": false
+  },
+  {
+    "variant": "upstream",
+    "op": "GET_ROWS",
+    "rc": 0,
+    "passed": 0,
+    "failed": 0,
+    "unsupported": 0,
+    "cuda_present": false
+  },
+  {
+    "variant": "upstream",
+    "op": "biased-V",
+    "rc": 0,
+    "passed": 0,
+    "failed": 0,
+    "unsupported": 0,
+    "cuda_present": false
+  },
+  {
+    "variant": "conv8",
+    "op": "FLASH_ATTN_EXT",
+    "rc": 0,
+    "passed": 0,
+    "failed": 0,
+    "unsupported": 0,
+    "cuda_present": false
+  },
+  {
+    "variant": "conv8",
+    "op": "MUL_MAT",
+    "rc": 0,
+    "passed": 0,
+    "failed": 0,
+    "unsupported": 0,
+    "cuda_present": false
+  },
+  {
+    "variant": "conv8",
+    "op": "CPY",
+    "rc": 0,
+    "passed": 0,
+    "failed": 0,
+    "unsupported": 0,
+    "cuda_present": false
+  },
+  {
+    "variant": "conv8",
+    "op": "GET_ROWS",
+    "rc": 0,
+    "passed": 0,
+    "failed": 0,
+    "unsupported": 0,
+    "cuda_present": false
+  },
+  {
+    "variant": "conv8",
+    "op": "biased-V",
+    "rc": 0,
+    "passed": 0,
+    "failed": 0,
+    "unsupported": 0,
+    "cuda_present": false
+  }
+]
