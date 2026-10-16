@@ -69,6 +69,20 @@ with tempfile.TemporaryDirectory(prefix=f'p100-{kind}-') as tmp:
                    MODELS='/FAKE/model.gguf /FAKE/second.gguf', PPL_TEXT='/FAKE/wiki.txt',
                    GGML_CUDA_DISABLE_MMVH='0',  # presence-checked; enabled arm must unset it
                    WORK=str(tmp / 'must-not-exist'), LLAMA_SRC=str(tmp / 'absent-llama'))
+        manifest_dir = tmp / 'scope-check'
+        manifest_dir.mkdir()
+        (manifest_dir / 'bench-only').mkdir()
+        for name in ('shared.patch', 'one-build.patch'):
+            (manifest_dir / 'bench-only' / name).touch()
+        (manifest_dir / 'README.md').write_text(
+            '| `bench-only/shared.patch` | all variants | fixture | never upstream |\n'
+            '| `bench-only/one-build.patch` | one build | fixture | never upstream |\n')
+        runner = (root / 'bench/patches/run.sh').read_text()
+        function = re.search(r'bench_patches_for_all\(\) \{.*?^\}', runner, re.S | re.M).group()
+        selected = subprocess.check_output(
+            ['bash', '-c', function + '\nPATCHES=$1; bench_patches_for_all', 'scope-check', str(manifest_dir)],
+            text=True).splitlines()
+        assert selected == [str(manifest_dir / 'bench-only/shared.patch')], selected
         patch_lists = dict(upstream=(3,), conv=(1, 3), conv8=(1, 2, 3),
                            flush=(1, 2, 3, 4), mmvh=(1, 2, 3, 5, 6), all=(1, 2, 3, 4, 5, 6))
         def check(variants, rounds, lb_rounds, models, fa_perf):
@@ -78,6 +92,8 @@ with tempfile.TemporaryDirectory(prefix=f'p100-{kind}-') as tmp:
             require('env.txt', 'variants: ' + ' '.join(variants))
             summary = require('summary.md', 'FAKE fixture')
             assert 'analyze tbo failed' not in summary and 'analyze lb failed' not in summary
+            assert 'mm-gbps failed' not in summary and 'Roofline: 732 GB/s' in summary
+            assert 'n=16 GB/s' in summary and 'n=16 % peak' in summary
             assert '## MUL_MAT timing' in summary and 'type_a=q5_K' in summary and 'type_a=q6_K' in summary
             assert ('## Kernel timing' in summary) == fa_perf
             if fa_perf:
@@ -102,7 +118,7 @@ with tempfile.TemporaryDirectory(prefix=f'p100-{kind}-') as tmp:
                         assert require(f'{v}.perf.r{r}.sql', '-- FAKE').count('INSERT INTO') == 144
                         call('tbo', 'perf', v, **{'-o': 'FLASH_ATTN_EXT', '-b': 'CUDA0', '--output': 'sql'})
                 for arm in arms:
-                    assert require(f'{arm}.mmperf.r{r}.sql', '-- FAKE').count('INSERT INTO') == 40
+                    assert require(f'{arm}.mmperf.r{r}.sql', '-- FAKE').count('INSERT INTO') == 320
                     call('tbo', 'perf', arm, **{'-o': 'MUL_MAT', '-b': 'CUDA0', '--output': 'sql'})
             for model in models:
                 for r in range(1, lb_rounds + 1):
@@ -129,8 +145,19 @@ with tempfile.TemporaryDirectory(prefix=f'p100-{kind}-') as tmp:
                 if tool == 'tbo' and mode == 'test':
                     assert actual['opts'].get('-p') == opts.get('-p')
             log = require('run.log', 'DRYRUN command: env -u GGML_CUDA_DISABLE_MMVH GGML_CUDA_DISABLE_MMVH=1')
-            applied = re.findall(r'DRYRUN: git -C .*?/([^/ ]+) apply .*?/(000[1-6])-[^\n]+', log)
+            applied = re.findall(r'DRYRUN: git -C .*?/([^/ ]+) apply [^\n]*/patches/(000[1-6])-[^\n]+', log)
             assert applied == [(v, f'{ordinal:04d}') for v in variants for ordinal in patch_lists[v]], applied
+            # Shared patches follow the series in every variant, selected by README scope.
+            shared = 'bench-only/0001-tests-mul_mat-perf-cases-1-16.patch'
+            all_applied = re.findall(r'DRYRUN: git -C .*?/([^/ ]+) apply [^\n]*/patches/([^\n]+)', log)
+            expected_patches = []
+            for v in variants:
+                for ordinal in patch_lists[v]:
+                    patch, = (root / 'third_party/patches').glob(f'{ordinal:04d}-*.patch')
+                    expected_patches.append((v, patch.name))
+                expected_patches.append((v, shared))
+            assert all_applied == expected_patches, all_applied
+            require('env.txt', shared.rsplit('/', 1)[1])
             assert log.count('--target test-backend-ops llama-bench llama-perplexity') == len(variants)
             assert re.findall(r'MUL_MAT perf ([\w-]+) round (\d+)', log) == [(a, str(r)) for r in range(1, rounds + 1) for a in arms]
             commands = [line for line in log.splitlines() if 'DRYRUN command:' in line]

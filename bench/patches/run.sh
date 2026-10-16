@@ -10,7 +10,9 @@
 #   flush=0001,0002,0003,0004; mmvh=0001,0002,0003,0005,0006; all=0001-0006.
 # Default variants: upstream conv8 flush mmvh. Default steps:
 #   micro (conversion), build, test (full FA, biased-V, MUL_MAT),
-#   perf (FA), mmperf (contiguous F32 MUL_MAT n=1..8), lb (kv and tg128), ppl.
+#   perf (FA), mmperf (contiguous F32 MUL_MAT n=1..16), lb (kv and tg128), ppl.
+# On sm_60, n=9..16 uses upstream's dequantise-to-FP16 + cuBLAS path; see
+#   docs/research/volta-fa-p9-lessons-2026-10-11.md sections 2 and 5.
 # ROADMAP questions: 0004 fixes biased-V? test + perf/lb measure its FA/pp/tg cost;
 #   H1/0005 decode correctness/speed? test + mmperf/lb + ppl cover Accept if.
 # GGML_CUDA_DISABLE_MMVH is presence-checked: enabled runs unset it; mmvh/all
@@ -64,6 +66,21 @@ patches_for() {
         printf '%s\n' "${files[@]}"
     done
 }
+# README is the manifest: only exact filenames marked "all variants" are shared.
+# A future build-specific bench patch is excluded by using another scope there.
+bench_patches_for_all() {
+    local p
+    while IFS= read -r p; do
+        [ -f "$PATCHES/$p" ] || { echo "missing bench-only patch $p" >&2; return 2; }
+        printf '%s\n' "$PATCHES/$p"
+    done < <(awk -F '|' '$2 ~ /`bench-only\/[^`]+\.patch`/ && $3 ~ /^ all variants $/ {
+        gsub(/[[:space:]`]/, "", $2); print $2
+    }' "$PATCHES/README.md")
+}
+all_patches_for() {
+    patches_for "$1" || return 2
+    bench_patches_for_all
+}
 has_mmvh() { [[ " $(ordinals_for "$1") " == *' 5 '* ]]; }
 # Alternate labels share the same binary. Always unset the presence-checked switch
 # first so an inherited value (even 0) cannot silently disable the enabled arm.
@@ -86,7 +103,7 @@ planned() {
         log "DRYRUN command: env -u GGML_CUDA_DISABLE_MMVH$command"
     fi
 }
-for v in $VARIANTS; do patches_for "$v" > /dev/null; done
+for v in $VARIANTS; do all_patches_for "$v" > /dev/null; done
 
 if [ "$DRYRUN" = 1 ]; then
     base="DRYRUN: no llama.cpp checkout or build; all tool outputs are FAKE fixtures"
@@ -103,6 +120,7 @@ fi
   nvcc --version | tail -1
   echo "variants: $VARIANTS"; echo "rounds: $ROUNDS (llama-bench: $LB_ROUNDS x $REPS reps)"
   echo "patches:"; sha256sum "$PATCHES"/*.patch
+  while IFS= read -r p; do sha256sum "$p"; done < <(bench_patches_for_all)
 ) > "$OUT/env.txt" 2>&1 || true
 
 if has micro; then
@@ -119,7 +137,7 @@ fi
 # Local perf cases: same shapes and session for quantised K/V and the f16 reference (INV-PERF-004).
 PERF_CASES='    for (int hs : {128, 256}) { for (int gqa : {4, 6, 8}) { for (int kv : {4096, 32768}) { for (int nb : {3, 4, 8, 16}) { for (ggml_type t : {GGML_TYPE_F16, GGML_TYPE_Q8_0, GGML_TYPE_Q4_0}) { test_cases.emplace_back(new test_flash_attn_ext(hs, hs, 4, {gqa, 1}, kv, nb, true, false, 0, 0, GGML_PREC_F32, t, t)); } } } } } // P100 patches harness'
 PERF_FILTER='hsk=(128|256),hsv=(128|256),nh=4,nr23=\[[468],1\],kv=(4096|32768),nb=(3|4|8|16),.*type_K=(f16|q8_0|q4_0),type_V=(f16|q8_0|q4_0)'
-MM_FILTER='type_a=(q4_0|q8_0|q4_K|q5_K|q6_K),type_b=f32,.*n=[1-8],k=.*per=\[0,1,2,3\],v=0(,|$)'
+MM_FILTER='type_a=(q4_0|q8_0|q4_K|q5_K|q6_K),type_b=f32,(m=(1024|4096|14336),n=([1-9]|1[0-6]),k=4096|m=4096,n=([1-9]|1[0-6]),k=14336),bs=\[1,1\],nr=\[1,1\],per=\[0,1,2,3\],k_v=0,o=1,src_overlap=0,m_v=0,pad=0(,|$)'
 PPL_READY=0
 if has ppl; then
     if [ -n "${PPL_TEXT:-}" ] && [ -n "${MODELS:-}" ]; then
@@ -144,8 +162,9 @@ for v in $VARIANTS; do
     if has build && [ "$DRYRUN" != 1 ]; then
         [ -d "$src" ] || git -C "$LLAMA_SRC" worktree add -q --detach "$src" "$base"
         git -C "$src" checkout -q -- .
-        mapfile -t variant_patches < <(patches_for "$v")
+        mapfile -t variant_patches < <(all_patches_for "$v")
         for p in "${variant_patches[@]}"; do
+            log "apply $p for $v"
             git -C "$src" apply "$p" || { log "patch $p does not apply for $v"; exit 1; }
         done
         t=$src/tests/test-backend-ops.cpp
@@ -160,7 +179,7 @@ for v in $VARIANTS; do
             log "  BUILD FAILED for $v"; tail -15 "$OUT/$v.build.log" | tee -a "$OUT/run.log"; continue
         fi
     elif has build; then
-        while IFS= read -r p; do log "DRYRUN: git -C $src apply $p"; done < <(patches_for "$v")
+        while IFS= read -r p; do log "DRYRUN: git -C $src apply $p"; done < <(all_patches_for "$v")
         log "DRYRUN: skipping worktree preparation and build for $v"
         log "DRYRUN: cmake --build $src/build --target ${targets[*]}"
     fi
@@ -286,6 +305,8 @@ done
             groups+=("$g")
         done
         python3 "$ROOT/bench/analyze.py" tbo "${groups[@]}" --labels "$(IFS=,; echo "${arms[*]}")" 2>&1 || echo "analyze tbo failed"
+        echo
+        python3 "$ROOT/bin/mm-gbps.py" "${groups[@]}" --labels "$(IFS=,; echo "${arms[*]}")" 2>&1 || echo "mm-gbps failed"
     fi
     for m in "${models[@]}"; do
         n=$(basename "$m" .gguf)

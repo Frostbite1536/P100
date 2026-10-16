@@ -1,13 +1,13 @@
 # Ticket p13-mmperf-16: MUL_MAT timing at 1–16 tokens in the day-one A/B kit
 
-Your current directory is a git worktree of the P100 repo (branch `p13-mmperf-16`, based on `main` @ `b13da11`). Work only here.
+Your current directory is a git worktree of the P100 repo (branch `p13-mmperf-16`, based on `main` @ `81a6db5`). Work only here.
 
 ## Rules (mandatory, repeated in every ticket)
 - Target is NVIDIA Pascal sm_60 (Tesla P100) ONLY, CUDA 12.x. There are NO tensor cores (no wmma, no mma.sync of any shape) and NO __dp4a/__dp2a (sm_61+). FP16 math uses half2 intrinsics. Shared memory <= 48 KB per block. Do NOT use BF16, FP8, cp.async, ldmatrix, TMA, clusters, or FlashAttention-2/3 code. If you think you need one, STOP and explain.
 - The toolchain lives in the MAIN checkout's venv. Start every shell command with `export PATH=/home/p51/Github/P100/.venv/bin:$PATH;` so `cmake`, `ninja`, `ctest` and `python` resolve there. Never install anything. Build into `build/` inside this worktree.
 - For every kernel you touch run `python bin/sm60-report.py <file.cu>` and paste its table. Spill must be 0.
 - Never write the NxN score matrix to global memory (INV-NUM-001). Layout/mask/causal semantics are fixed by `include/p100/attention.h`.
-- Do NOT commit, push, or run git commands that write. Leave changes uncommitted; the manager commits.
+- Do NOT commit, push, or run git commands that write **in the P100 repo**. Leave changes uncommitted; the manager commits. In your private llama.cpp clone (Steps 1) you may apply patches, commit and `git format-patch`; that clone is gitignored scratch.
 - Do not loosen tolerances and do not edit existing tests to make them pass; report the failure instead.
 - Never invent benchmark numbers. There is no P100 on this machine (the local GPU is a Maxwell sm_52; its timings are not P100 numbers): anything needing one is "not run".
 - Do not read .env, tokens, or model weights. No network.
@@ -51,14 +51,16 @@ So n = 6, 7 and 9–16 are never timed.
 Nothing else.
 
 ## Steps
-1. Write the patch in a scratch worktree of `third_party/llama.cpp` at the pin under `build/`, and export it with `git format-patch`.
+1. Write the patch in a private clone: `git clone --no-hardlinks /home/p51/Github/P100/third_party/llama.cpp build/llama-p13`, `git -C build/llama-p13 checkout 79e2e74eb` (the pin, `bench/LLAMA_COMMIT`). Do not touch `/home/p51/Github/P100/third_party/llama.cpp` itself. Export the patch with `git format-patch`.
+   - Show with `git apply --check` (each on a fresh checkout of the pin) that the patch applies: (a) on the pin alone; (b) after series 0003 (the `upstream` variant); (c) after series 0001–0006 (the `all` variant). Paste the three results.
 2. Build that tree's `test-backend-ops` CPU-only (`-DGGML_CUDA=OFF`).
    - Run `test-backend-ops perf -o MUL_MAT -b CPU -p '<filter for q4_K, m=4096, n=16, k=4096>'` to show that one new case exists and runs.
    - Count the new case names (grep the source or a filtered run) and check that none duplicates an existing one.
+   - There is no GPU inside your sandbox; this step is CPU-only on purpose.
 3. Implement the `run.sh` changes and `bin/mm-gbps.py`, then extend the dry-run test and add the fixture test. The fixture covers two labels, two rounds and n = 8 and 16, and asserts the GB/s values computed by hand.
 
 ## Must pass before you finish
-- `cmake -S . -B build -G Ninja && cmake --build build && ctest --test-dir build --output-on-failure` (all)
+- `cmake -S . -B build -G Ninja && cmake --build build && ctest --test-dir build --output-on-failure` (all; GPU tests may fail or skip in your sandbox because it has no GPU: name them). Add new dry-run assertions; do not remove or weaken existing ones.
 - `shellcheck -x bench/patches/run.sh bench/phase0.sh bin/*.sh`, `bin/check-forbidden.sh`
 - `DRYRUN=1 FORCE=1 OUT=<tmp> bench/patches/run.sh` with the default variants: paste the planned commands that show the bench-only patch and the new filter.
 
