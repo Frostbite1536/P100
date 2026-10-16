@@ -9,7 +9,7 @@
 # Variants: upstream=0003; conv=0001,0003; conv8=0001,0002,0003;
 #   flush=0001,0002,0003,0004; mmvh=0001,0002,0003,0005,0006; all=0001-0006.
 # Default variants: upstream conv8 flush mmvh. Default steps:
-#   micro (conversion), build, test (full FA, biased-V, MUL_MAT),
+#   micro (conversion), build, test (full FA, biased-V, MUL_MAT, activation range),
 #   perf (FA), mmperf (contiguous F32 MUL_MAT n=1..16), lb (kv and tg128), ppl.
 # On sm_60, n=9..16 uses upstream's dequantise-to-FP16 + cuBLAS path; see
 #   docs/research/volta-fa-p9-lessons-2026-10-11.md sections 2 and 5.
@@ -151,6 +151,9 @@ fi
 PERF_CASES='    for (int hs : {128, 256}) { for (int gqa : {4, 6, 8}) { for (int kv : {4096, 32768}) { for (int nb : {3, 4, 8, 16}) { for (ggml_type t : {GGML_TYPE_F16, GGML_TYPE_Q8_0, GGML_TYPE_Q4_0}) { test_cases.emplace_back(new test_flash_attn_ext(hs, hs, 4, {gqa, 1}, kv, nb, true, false, 0, 0, GGML_PREC_F32, t, t)); } } } } } // P100 patches harness'
 PERF_FILTER='hsk=(128|256),hsv=(128|256),nh=4,nr23=\[[468],1\],kv=(4096|32768),nb=(3|4|8|16),.*type_K=(f16|q8_0|q4_0),type_V=(f16|q8_0|q4_0)'
 MM_FILTER='type_a=(q4_0|q8_0|q4_K|q5_K|q6_K),type_b=f32,(m=(1024|4096|14336),n=([1-9]|1[0-6]),k=4096|m=4096,n=([1-9]|1[0-6]),k=14336),bs=\[1,1\],nr=\[1,1\],per=\[0,1,2,3\],k_v=0,o=1,src_overlap=0,m_v=0,pad=0(,|$)'
+# Full MUL_MAT correctness keeps the pre-range case set: bench-only 0003's src1_scale
+# cases fail on upstream's q8_1 path by design and are reported separately below.
+MM_TEST_FILTER='^(?!.*src1_scale=)'
 PPL_READY=0
 if has ppl; then
     if [ -n "${PPL_TEXT:-}" ] && [ -n "${MODELS:-}" ]; then
@@ -232,9 +235,9 @@ for v in "${trees[@]}"; do
     built+=("$v")
     if has test; then
         for op in FLASH_ATTN_EXT MUL_MAT; do
-            tag=fa; [ "$op" = MUL_MAT ] && tag=mulmat
+            tag=fa; filter=(); [ "$op" = MUL_MAT ] && { tag=mulmat; filter=(-p "$MM_TEST_FILTER"); }
             log "correctness $v (full $op CUDA0)"
-            run_arm "$v" "$(tbo_for "$v")" test -b CUDA0 -o "$op" > "$OUT/$v.$tag-test-CUDA0.txt" 2>&1 && rc=0 || rc=$?
+            run_arm "$v" "$(tbo_for "$v")" test -b CUDA0 -o "$op" "${filter[@]}" > "$OUT/$v.$tag-test-CUDA0.txt" 2>&1 && rc=0 || rc=$?
             log "  rc=$rc  OK=$(grep -c 'OK' "$OUT/$v.$tag-test-CUDA0.txt" || true)  FAIL=$(grep -c 'FAIL' "$OUT/$v.$tag-test-CUDA0.txt" || true)"
             if [ "$op" = FLASH_ATTN_EXT ]; then
                 log "biased-V correctness: $(tbo_for "$v") test -b CUDA0 -o FLASH_ATTN_EXT -p v_bias"
@@ -244,10 +247,16 @@ for v in "${trees[@]}"; do
         done
         if has_mmvh "$v"; then
             log "correctness $v-nommvh (full MUL_MAT CUDA0)"
-            planned "$v-nommvh" "$(tbo_for "$v")" test -b CUDA0 -o MUL_MAT
-            run_arm "$v-nommvh" "$(tbo_for "$v")" test -b CUDA0 -o MUL_MAT > "$OUT/$v-nommvh.mulmat-test-CUDA0.txt" 2>&1 && rc=0 || rc=$?
+            planned "$v-nommvh" "$(tbo_for "$v")" test -b CUDA0 -o MUL_MAT -p "$MM_TEST_FILTER"
+            run_arm "$v-nommvh" "$(tbo_for "$v")" test -b CUDA0 -o MUL_MAT -p "$MM_TEST_FILTER" > "$OUT/$v-nommvh.mulmat-test-CUDA0.txt" 2>&1 && rc=0 || rc=$?
             log "  rc=$rc  OK=$(grep -c 'OK' "$OUT/$v-nommvh.mulmat-test-CUDA0.txt" || true)  FAIL=$(grep -c 'FAIL' "$OUT/$v-nommvh.mulmat-test-CUDA0.txt" || true)"
         fi
+        while IFS= read -r arm; do
+            log "activation range $arm (MUL_MAT CUDA0; upstream q8_1 failures expected)"
+            planned "$arm" "$(tbo_for "$v")" test -b CUDA0 -o MUL_MAT -p src1_scale
+            run_arm "$arm" "$(tbo_for "$v")" test -b CUDA0 -o MUL_MAT -p src1_scale > "$OUT/$arm.range.txt" 2>&1 && rc=0 || rc=$?
+            log "  range rc=$rc (see $arm.range.txt)"
+        done < <(arms_for "$v")
     fi
 done
 [ ${#built[@]} -gt 0 ] || { log "no variant built"; exit 1; }
@@ -352,6 +361,12 @@ done
     if has test; then
         echo "## Correctness"; echo
         grep -E '^\[.*\] (correctness|  rc=)' "$OUT/run.log" | sed 's/^/    /' || true; echo
+        echo "## Activation range: cases fail on upstream's q8_1 path by design (not a regression signal)"; echo
+        for arm in "${arms[@]}"; do
+            echo "- $arm ($arm.range.txt):"
+            grep -E '[0-9]+/[0-9]+ tests passed' "$OUT/$arm.range.txt" | sed 's/^/  /' || echo "  pass count missing; inspect log"
+        done
+        echo
     fi
     if [ -s "$OUT/dequant_nc.txt" ]; then
         echo "## Conversion microbenchmark (bench/micro/dequant_nc.cu)"; echo

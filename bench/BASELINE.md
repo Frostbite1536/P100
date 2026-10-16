@@ -18,3 +18,4 @@ Fill in on the first day with the P100s. Every result file links back here (INV-
 
 `mmperf` covers Q4_0/Q8_0/Q4_K/Q5_K/Q6_K at n=1–16 for (m,k)=(4096,4096), (1024,4096), (14336,4096), (4096,14336); 9–16 uses upstream’s dequantise-to-FP16 + cuBLAS path on sm_60, and `summary.md` reports effective GB/s against 732 GB/s ([research §§2,5](../docs/research/volta-fa-p9-lessons-2026-10-11.md)).
 `STEPS="build kld"` (then `STEPS=kld` to reuse builds), with explicit `MODELS` and `PPL_TEXT`, compares each arm against an FP32 reference rather than upstream; `KLD_UB=8` keeps n ≤ 8 in MMVH (n ≥ 9 routes to cuBLAS on sm_60), `KLD_CHUNKS=8` by default, and `summary.md` preserves Mean/Maximum KLD, RMS Δp and Same top p lines.
+`*.range.txt` answers whether each arm preserves activation range at 1e5 and 1e-5 for n=1/2/4/8/16 (Q4_0/Q8_0 skip 1e-5 because their CPU reference underflows); upstream q8_1 failures are expected by design, not a regression signal.
