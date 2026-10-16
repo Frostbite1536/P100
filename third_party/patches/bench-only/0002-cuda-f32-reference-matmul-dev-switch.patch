@@ -1,0 +1,34 @@
+From b779fa9905f679e3fa9a142e7f47e183aa34d958 Mon Sep 17 00:00:00 2001
+From: P100 Bench <p100-bench@localhost>
+Date: Fri, 16 Oct 2026 08:51:23 -0500
+Subject: [PATCH] cuda: bench-only FP32 reference matmul development switch
+
+---
+ ggml/src/ggml-cuda/ggml-cuda.cu | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/ggml/src/ggml-cuda/ggml-cuda.cu b/ggml/src/ggml-cuda/ggml-cuda.cu
+index 957908f65..13675b067 100644
+--- a/ggml/src/ggml-cuda/ggml-cuda.cu
++++ b/ggml/src/ggml-cuda/ggml-cuda.cu
+@@ -1904,6 +1904,17 @@ static bool ggml_cuda_match_shared_expert(const ggml_cgraph * graph, int routed_
+ }
+ 
+ static void ggml_cuda_mul_mat(ggml_backend_cuda_context & ctx, const ggml_tensor * src0, const ggml_tensor * src1, ggml_tensor * dst) {
++    static const bool dev_f32_ref = getenv("GGML_CUDA_F32_REF") != nullptr; // DEV: FP32 reference (dequantize + SGEMM)
++    if (dev_f32_ref && ggml_is_quantized(src0->type)) { // DEV: bench-only, never upstream
++        static const bool notified = []() {
++            fprintf(stderr, "GGML_CUDA_F32_REF: quantised MUL_MAT via dequantize + SGEMM\n");
++            return true;
++        }();
++        (void) notified;
++        ggml_cuda_mul_mat_cublas_impl<GGML_TYPE_F32>(ctx, src0, src1, dst);
++        return;
++    }
++
+     GGML_TENSOR_BINARY_OP_LOCALS
+ 
+     if (ggml_cuda_op_mul_mat_use_fwht(dst) && ggml_cuda_op_fwht(ctx, src1, dst)) {
+-- 
+2.43.0
+

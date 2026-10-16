@@ -19,7 +19,7 @@ with tempfile.TemporaryDirectory(prefix=f'p100-{kind}-') as tmp:
     env = dict(os.environ, PATH=f'{shims}:{os.environ["PATH"]}', OUT=str(tmp / 'results'),
                SHIM_CALL_LOG=str(tmp / 'calls.jsonl'), FORCE='0')
     # Isolate the tests from inherited benchmark settings and local model lists.
-    for key in ('TBO', 'LB', 'MODELS', 'VARIANTS', 'ROUNDS', 'LB_ROUNDS', 'STEPS', 'DRYRUN', 'LLAMA', 'TAG', 'SHIM_NCU_MODE', 'PATCHES', 'PPL_TEXT', 'GGML_CUDA_DISABLE_MMVH', 'GGML_CUDA_FORCE_MMVH'):
+    for key in ('TBO', 'LB', 'MODELS', 'VARIANTS', 'ROUNDS', 'LB_ROUNDS', 'STEPS', 'DRYRUN', 'LLAMA', 'TAG', 'SHIM_NCU_MODE', 'PATCHES', 'PPL_TEXT', 'GGML_CUDA_DISABLE_MMVH', 'GGML_CUDA_FORCE_MMVH', 'GGML_CUDA_F32_REF', 'KLD_UB', 'KLD_CHUNKS', 'SHIM_KLD_MODE'):
         env.pop(key, None)
     env['LLAMA'] = str(tmp / 'absent-llama')
     out = Path(env['OUT'])
@@ -182,6 +182,84 @@ with tempfile.TemporaryDirectory(prefix=f'p100-{kind}-') as tmp:
             skip_env.pop(missing)
             subprocess.run(['bash', str(root / 'bench/patches/run.sh')], cwd=root, env=skip_env, check=True)
             assert 'ppl skipped: set PPL_TEXT and MODELS' in (Path(skip_env['OUT']) / 'run.log').read_text()
+    elif kind == 'patches_kld':
+        variants = ('upstream', 'conv', 'conv8', 'flush', 'mmvh', 'all')
+        arms = ('upstream', 'conv', 'conv8', 'flush', 'mmvh', 'mmvh-nommvh', 'all', 'all-nommvh')
+        env.update(DRYRUN='1', STEPS='build kld', VARIANTS=' '.join(variants),
+                   MODELS='/FAKE/model.gguf /FAKE/second.gguf', PPL_TEXT='/FAKE/wiki.txt',
+                   GGML_CUDA_DISABLE_MMVH='0', GGML_CUDA_F32_REF='0',
+                   WORK=str(tmp / 'must-not-exist'), LLAMA_SRC=str(tmp / 'absent-llama'))
+        def check_kld(ub, chunks, models, build):
+            run('bench/patches/run.sh')
+            assert not Path(env['WORK']).exists()
+            assert not Path(env['LLAMA_SRC']).exists()
+            assert not list(out.glob('*.kld')), 'large reference base was not deleted'
+            summary = require('summary.md', 'FAKE fixture')
+            assert '## Perplexity' not in summary and '## Correctness' not in summary
+            assert '## Kernel timing' not in summary and '## llama-bench' not in summary
+            calls = [json.loads(line) for line in Path(env['SHIM_CALL_LOG']).read_text().splitlines()]
+            assert len(calls) == len(models) * (1 + len(arms)), calls
+            for model_index, model in enumerate(models):
+                group = calls[model_index * (1 + len(arms)):(model_index + 1) * (1 + len(arms))]
+                base = str(out / f'{model}.ref.kld')
+                opts = {'-m': f'/FAKE/{model}.gguf', '-f': '/FAKE/wiki.txt', '-c': '512',
+                        '-b': str(ub), '-ub': str(ub), '-ngl': '99', '-fa': 'on',
+                        '--chunks': str(chunks), '--kl-divergence-base': base}
+                for index, actual in enumerate(group):
+                    arm = 'ref' if index == 0 else arms[index - 1]
+                    assert actual == dict(tool='ppl', opts=opts, kld_arm=index != 0,
+                                          f32_ref='1' if index == 0 else None,
+                                          disable_mmvh='1' if arm.endswith('-nommvh') else None), actual
+                    if index == 0:
+                        require(f'ref.{model}.kld.err', 'GGML_CUDA_F32_REF: quantised MUL_MAT via dequantize + SGEMM')
+                    else:
+                        assert f'- {arm} ({arm}.{model}.kld.txt):' in summary
+                        text = require(f'{arm}.{model}.kld.txt', 'FAKE')
+                        metrics = [line for line in text.splitlines() if re.match(r'Mean\s+KLD:|Maximum KLD:|RMS Δp\s*:|Same top p:', line)]
+                        assert len(metrics) == 4
+                        assert '\n'.join(metrics) in summary, 'metrics must be preserved verbatim'
+                assert f'## KL divergence {model} against FP32 (512 context, {chunks} chunks, batch/ubatch {ub})' in summary
+            log = require('run.log', 'done:')
+            assert summary.count('Mean    KLD:') == len(models) * len(arms)
+            commands = [line for line in log.splitlines() if 'DRYRUN command:' in line]
+            assert len(commands) == len(calls)
+            assert sum('GGML_CUDA_F32_REF=1' in line for line in commands) == len(models)
+            assert sum(' --kl-divergence' in line and line.endswith(' --kl-divergence') for line in commands) == len(models) * len(arms)
+            applied = re.findall(r'DRYRUN: git -C .*?/([^/ ]+) apply [^\n]*/patches/([^\n]+)', log)
+            if build:
+                shared = 'bench-only/0001-tests-mul_mat-perf-cases-1-16.patch'
+                ref_patch = 'bench-only/0002-cuda-f32-reference-matmul-dev-switch.patch'
+                series3, = (root / 'third_party/patches').glob('0003-*.patch')
+                assert [p for v, p in applied if v == 'ref'] == [series3.name, shared, ref_patch]
+                assert [(v, p) for v, p in applied if p == ref_patch] == [('ref', ref_patch)]
+                assert [v for v, p in applied if p == shared] == [*variants, 'ref']
+                assert log.count('--target llama-perplexity\n') == 1
+                assert log.count('--target test-backend-ops llama-bench llama-perplexity') == len(variants)
+            else:
+                assert not applied and 'cmake --build' not in log
+        check_kld(8, 8, ('model', 'second'), True)
+        # Reuse mode, including both tunable defaults overridden explicitly.
+        env.update(OUT=str(tmp / 'reuse'), SHIM_CALL_LOG=str(tmp / 'reuse.jsonl'),
+                   STEPS='kld', KLD_UB='4', KLD_CHUNKS='2', MODELS='/FAKE/model.gguf')
+        out = Path(env['OUT'])
+        check_kld(4, 2, ('model',), False)
+        for missing in ('PPL_TEXT', 'MODELS'):
+            skip_env = dict(env, OUT=str(tmp / f'skip-{missing}'), SHIM_CALL_LOG=str(tmp / f'skip-{missing}.jsonl'))
+            skip_env.pop(missing)
+            subprocess.run(['bash', str(root / 'bench/patches/run.sh')], cwd=root, env=skip_env, check=True)
+            skip_log = (Path(skip_env['OUT']) / 'run.log').read_text()
+            assert skip_log.count('kld skipped: set PPL_TEXT and MODELS') == 1
+            assert not Path(skip_env['SHIM_CALL_LOG']).exists()
+            assert 'for ref' not in skip_log
+        for mode, message in (('no-marker', 'kld reference switch did not take effect'),
+                              ('arm-fail', 'kld arm failed'), ('missing-metric', 'kld metric missing')):
+            fail_env = dict(env, OUT=str(tmp / mode), SHIM_CALL_LOG=str(tmp / f'{mode}.jsonl'), SHIM_KLD_MODE=mode)
+            failed = subprocess.run(['bash', str(root / 'bench/patches/run.sh')], cwd=root, env=fail_env)
+            assert failed.returncode != 0
+            fail_out = Path(fail_env['OUT'])
+            assert message in (fail_out / 'run.log').read_text()
+            assert not list(fail_out.glob('*.kld')), 'failed run left a large base file'
+            assert not (fail_out / 'summary.md').exists()
     else:
         raise AssertionError(f'unknown dry-run kind: {kind}')
 print(f'{kind}: FAKE {"A/B " if kind == "patches" else ""}plumbing checks passed; temporary results removed')
