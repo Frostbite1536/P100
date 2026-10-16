@@ -83,7 +83,7 @@ endif()
 # llama.cpp, models, worktree writes, or persistent benchmark output.
 if(Python3_Interpreter_FOUND)
   find_program(P100_BASH_EXECUTABLE bash REQUIRED)
-  foreach(kind phase0 patches)
+  foreach(kind phase0 patches patches_kld)
     add_test(NAME ${kind}_dryrun
       COMMAND ${CMAKE_COMMAND} -E env "PYTHON=${Python3_EXECUTABLE}"
               ${P100_BASH_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/shims/dryrun
@@ -93,6 +93,8 @@ if(Python3_Interpreter_FOUND)
   # Includes default day-one variants/steps, all six patch lists and MMVH arms.
   set_tests_properties(patches_dryrun PROPERTIES
     PASS_REGULAR_EXPRESSION "patches: FAKE A/B plumbing checks passed")
+  set_tests_properties(patches_kld_dryrun PROPERTIES
+    PASS_REGULAR_EXPRESSION "patches_kld: FAKE plumbing checks passed")
 endif()
 
 # Decode predictions and compile-only llama.cpp dot-product SASS fixtures.

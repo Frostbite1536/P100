@@ -4,16 +4,48 @@ set -euo pipefail
 exec "${PYTHON:-python3}" - "$@" <<'PY'
 import json
 import os
+from pathlib import Path
 import sys
 
 args = sys.argv[1:]
+is_kld_arm = '--kl-divergence' in args
+if is_kld_arm:
+    args.remove('--kl-divergence')
 assert len(args) % 2 == 0
 opts = dict(zip(args[::2], args[1::2]))
-assert set(opts) == {'-m', '-f', '-c', '--chunks', '-ngl', '-fa'}
-assert (opts['-c'], opts['--chunks'], opts['-ngl'], opts['-fa']) == ('512', '32', '99', 'on')
+is_kld = '--kl-divergence-base' in opts
+expected = {'-m', '-f', '-c', '--chunks', '-ngl', '-fa'}
+if is_kld:
+    expected |= {'-b', '-ub', '--kl-divergence-base'}
+    assert opts['-b'] == opts['-ub'] and int(opts['-ub']) > 0
+    assert int(opts['--chunks']) > 0
+else:
+    assert not is_kld_arm
+    assert opts['--chunks'] == '32'
+assert set(opts) == expected
+assert (opts['-c'], opts['-ngl'], opts['-fa']) == ('512', '99', 'on')
 with open(os.environ['SHIM_CALL_LOG'], 'a') as f:
     f.write(json.dumps(dict(tool='ppl', opts=opts,
-                           disable_mmvh=os.environ.get('GGML_CUDA_DISABLE_MMVH'))) + '\n')
+                           disable_mmvh=os.environ.get('GGML_CUDA_DISABLE_MMVH'),
+                           f32_ref=os.environ.get('GGML_CUDA_F32_REF'),
+                           kld_arm=is_kld_arm)) + '\n')
 print('FAKE perplexity fixture: no model, text or GPU accessed')
-print('FAKE Final estimate: PPL = 10.0000 +/- 0.1000 (synthetic fixture only)')
+if not is_kld:
+    print('FAKE Final estimate: PPL = 10.0000 +/- 0.1000 (synthetic fixture only)')
+elif not is_kld_arm:
+    assert os.environ.get('GGML_CUDA_F32_REF') == '1'
+    Path(opts['--kl-divergence-base']).write_text('FAKE reference base; no logits\n')
+    if os.environ.get('SHIM_KLD_MODE') != 'no-marker':
+        print('GGML_CUDA_F32_REF: quantised MUL_MAT via dequantize + SGEMM', file=sys.stderr)
+else:
+    assert 'GGML_CUDA_F32_REF' not in os.environ
+    assert Path(opts['--kl-divergence-base']).read_text() == 'FAKE reference base; no logits\n'
+    if os.environ.get('SHIM_KLD_MODE') == 'arm-fail':
+        sys.exit(3)
+    # Match the pin's metric labels and spacing; numbers are synthetic FAKE data.
+    print('Mean    KLD:   0.001000 ±   0.000100 (FAKE)')
+    print('Maximum KLD:   0.002000 (FAKE)')
+    if os.environ.get('SHIM_KLD_MODE') != 'missing-metric':
+        print('RMS Δp    :  0.100 ± 0.010 % (FAKE)')
+    print('Same top p: 99.000 ± 0.100 % (FAKE)')
 PY

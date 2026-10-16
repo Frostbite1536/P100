@@ -18,6 +18,11 @@
 # GGML_CUDA_DISABLE_MMVH is presence-checked: enabled runs unset it; mmvh/all
 #   also run MUL_MAT correctness, mmperf, lb and ppl with it set to 1 (-nommvh).
 # PPL requires explicit MODELS and PPL_TEXT; otherwise it logs a skip.
+# Opt-in kld (STEPS="build kld", then STEPS=kld to reuse) measures accuracy
+#   against FP32, not upstream. Requires MODELS and PPL_TEXT; KLD_CHUNKS=8.
+#   KLD_UB=8 keeps n <= 8 in MMVH (n >= 9 routes to cuBLAS on sm_60).
+#   Bench-only 0002 is the exception to shared bench patches: ref build only.
+#   ref = upstream + shared bench patches + bench-only 0002; never a variant.
 # Results: bench/results/patches-<stamp>-<host>/; summary.md uses analyze.py tbo/lb
 #   (calibrate-decode.py is absent in this tree) and final PPL +/- error log lines.
 set -euo pipefail
@@ -31,6 +36,8 @@ DRYRUN=${DRYRUN:-0}
 ROUNDS=${ROUNDS:-3}
 LB_ROUNDS=${LB_ROUNDS:-2}
 REPS=${REPS:-3}
+KLD_UB=${KLD_UB:-8}
+KLD_CHUNKS=${KLD_CHUNKS:-8}
 PATCHES=$ROOT/third_party/patches
 OUT=${OUT:-$ROOT/bench/results/patches-$(date +%Y%m%d-%H%M%S)-$(hostname -s 2>/dev/null || hostname)}
 mkdir -p "$OUT"
@@ -81,6 +88,12 @@ all_patches_for() {
     patches_for "$1" || return 2
     bench_patches_for_all
 }
+ref_patches() {
+    all_patches_for upstream || return 2
+    local p=$PATCHES/bench-only/0002-cuda-f32-reference-matmul-dev-switch.patch
+    [ -f "$p" ] || { echo "missing ref-only patch $p" >&2; return 2; }
+    printf '%s\n' "$p"
+}
 has_mmvh() { [[ " $(ordinals_for "$1") " == *' 5 '* ]]; }
 # Alternate labels share the same binary. Always unset the presence-checked switch
 # first so an inherited value (even 0) cannot silently disable the enabled arm.
@@ -120,7 +133,7 @@ fi
   nvcc --version | tail -1
   echo "variants: $VARIANTS"; echo "rounds: $ROUNDS (llama-bench: $LB_ROUNDS x $REPS reps)"
   echo "patches:"; sha256sum "$PATCHES"/*.patch
-  while IFS= read -r p; do sha256sum "$p"; done < <(bench_patches_for_all)
+  sha256sum "$PATCHES"/bench-only/*.patch  # includes the ref-only kld patch
 ) > "$OUT/env.txt" 2>&1 || true
 
 if has micro; then
@@ -145,47 +158,77 @@ if has ppl; then
         PPL_READY=1
     else log "ppl skipped: set PPL_TEXT and MODELS"; fi
 fi
+KLD_READY=0
+if has kld; then
+    if [ -n "${PPL_TEXT:-}" ] && [ -n "${MODELS:-}" ]; then
+        if [ "$DRYRUN" != 1 ] && [ ! -f "$PPL_TEXT" ]; then log "missing PPL_TEXT: $PPL_TEXT"; exit 2; fi
+        [[ "$KLD_UB" =~ ^[1-9][0-9]*$ && "$KLD_CHUNKS" =~ ^[1-9][0-9]*$ ]] || {
+            log "KLD_UB and KLD_CHUNKS must be positive integers"; exit 2;
+        }
+        ref_patches > /dev/null
+        KLD_READY=1
+        # Also remove a partial reference if generation or any arm fails.
+        trap 'if [ -n "${kld_base:-}" ]; then rm -f -- "$kld_base"; fi' EXIT
+    else log "kld skipped: set PPL_TEXT and MODELS"; fi
+fi
 
 # Select binaries per variant. Fixture mode deliberately never touches WORK.
 tbo_for() { if [ "$DRYRUN" = 1 ]; then echo "$DRY_TBO"; else echo "$WORK/$1/build/bin/test-backend-ops"; fi; }
 lb_for() { if [ "$DRYRUN" = 1 ]; then echo "$DRY_LB"; else echo "$WORK/$1/build/bin/llama-bench"; fi; }
 ppl_for() { if [ "$DRYRUN" = 1 ]; then echo "$DRY_PPL"; else echo "$WORK/$1/build/bin/llama-perplexity"; fi; }
 targets=(test-backend-ops llama-bench)
-[ "$PPL_READY" = 0 ] || targets+=(llama-perplexity)
+[ "$PPL_READY" = 0 ] && [ "$KLD_READY" = 0 ] || targets+=(llama-perplexity)
+trees=()
+read -ra trees <<< "$VARIANTS"
+[ "$KLD_READY" = 0 ] || trees+=(ref)
 built=()
 if has build && [ "$DRYRUN" != 1 ]; then
     mkdir -p "$WORK"
     git -C "$LLAMA_SRC" worktree prune
 fi
-for v in $VARIANTS; do
+for v in "${trees[@]}"; do
     src=$WORK/$v
+    variant_targets=("${targets[@]}")
+    if [ "$v" = ref ]; then
+        mapfile -t variant_patches < <(ref_patches)
+        variant_targets=(llama-perplexity)
+    else
+        mapfile -t variant_patches < <(all_patches_for "$v")
+    fi
     if has build && [ "$DRYRUN" != 1 ]; then
         [ -d "$src" ] || git -C "$LLAMA_SRC" worktree add -q --detach "$src" "$base"
         git -C "$src" checkout -q -- .
-        mapfile -t variant_patches < <(all_patches_for "$v")
         for p in "${variant_patches[@]}"; do
             log "apply $p for $v"
             git -C "$src" apply "$p" || { log "patch $p does not apply for $v"; exit 1; }
         done
-        t=$src/tests/test-backend-ops.cpp
-        anchor='test_flash_attn_ext(72, 72, 16, {1, 1}, 5776, 5776'
-        [ "$(grep -cF "$anchor" "$t")" = 1 ] || { log "perf anchor not unique in $t"; exit 1; }
-        L="$PERF_CASES" perl -pi -e 'if (index($_, q{'"$anchor"'}) >= 0) { $_ .= "$ENV{L}\n" }' "$t"
+        if [ "$v" != ref ]; then
+            t=$src/tests/test-backend-ops.cpp
+            anchor='test_flash_attn_ext(72, 72, 16, {1, 1}, 5776, 5776'
+            [ "$(grep -cF "$anchor" "$t")" = 1 ] || { log "perf anchor not unique in $t"; exit 1; }
+            L="$PERF_CASES" perl -pi -e 'if (index($_, q{'"$anchor"'}) >= 0) { $_ .= "$ENV{L}\n" }' "$t"
+        fi
         git -C "$src" diff > "$OUT/$v.patch"
         log "build $v for sm_60"
         if ! { cmake -S "$src" -B "$src/build" -G Ninja -DCMAKE_BUILD_TYPE=Release -DGGML_CUDA=ON \
                  -DCMAKE_CUDA_ARCHITECTURES=60 -DBUILD_SHARED_LIBS=OFF -DLLAMA_CURL=OFF > "$OUT/$v.build.log" 2>&1 &&
-               cmake --build "$src/build" --target "${targets[@]}" >> "$OUT/$v.build.log" 2>&1; }; then
-            log "  BUILD FAILED for $v"; tail -15 "$OUT/$v.build.log" | tee -a "$OUT/run.log"; continue
+               cmake --build "$src/build" --target "${variant_targets[@]}" >> "$OUT/$v.build.log" 2>&1; }; then
+            log "  BUILD FAILED for $v"; tail -15 "$OUT/$v.build.log" | tee -a "$OUT/run.log"
+            [ "$v" != ref ] || exit 1
+            continue
         fi
     elif has build; then
-        while IFS= read -r p; do log "DRYRUN: git -C $src apply $p"; done < <(all_patches_for "$v")
+        for p in "${variant_patches[@]}"; do log "DRYRUN: git -C $src apply $p"; done
         log "DRYRUN: skipping worktree preparation and build for $v"
-        log "DRYRUN: cmake --build $src/build --target ${targets[*]}"
+        log "DRYRUN: cmake --build $src/build --target ${variant_targets[*]}"
+    fi
+    if [ "$v" = ref ]; then
+        [ -x "$(ppl_for ref)" ] || { log "missing llama-perplexity for ref; run STEPS='build kld' first"; exit 1; }
+        continue
     fi
     if { has test || has perf || has mmperf; } && [ ! -x "$(tbo_for "$v")" ]; then log "missing test-backend-ops for $v; run STEPS=build first"; exit 1; fi
     if has lb && [ ! -x "$(lb_for "$v")" ]; then log "missing llama-bench for $v; run STEPS=build first"; exit 1; fi
-    if [ "$PPL_READY" = 1 ] && [ ! -x "$(ppl_for "$v")" ]; then log "missing llama-perplexity for $v; run STEPS=build first"; exit 1; fi
+    if { [ "$PPL_READY" = 1 ] || [ "$KLD_READY" = 1 ]; } && [ ! -x "$(ppl_for "$v")" ]; then log "missing llama-perplexity for $v; run STEPS=build first"; exit 1; fi
     built+=("$v")
     if has test; then
         for op in FLASH_ATTN_EXT MUL_MAT; do
@@ -240,6 +283,32 @@ elif has lb && [ "$DRYRUN" != 1 ] && [ -f bench/models.txt ]; then
 fi
 for m in "${models[@]}"; do
     n=$(basename "$m" .gguf)
+    if [ "$KLD_READY" = 1 ]; then
+        kld_base=$OUT/$n.ref.kld
+        kld_args=(-m "$m" -f "$PPL_TEXT" -c 512 -b "$KLD_UB" -ub "$KLD_UB" -ngl 99 -fa on
+                  --chunks "$KLD_CHUNKS" --kl-divergence-base "$kld_base")
+        log "FP32 reference $n ref"
+        planned ref env -u GGML_CUDA_F32_REF GGML_CUDA_F32_REF=1 "$(ppl_for ref)" "${kld_args[@]}"
+        run_arm ref env -u GGML_CUDA_F32_REF GGML_CUDA_F32_REF=1 "$(ppl_for ref)" "${kld_args[@]}" \
+            > "$OUT/ref.$n.kld.txt" 2> "$OUT/ref.$n.kld.err" || { log "kld reference failed for $n"; exit 1; }
+        grep -Fxq 'GGML_CUDA_F32_REF: quantised MUL_MAT via dequantize + SGEMM' "$OUT/ref.$n.kld.err" || {
+            log "kld reference switch did not take effect for $n"; exit 1;
+        }
+        [ -s "$kld_base" ] || { log "kld reference base missing for $n"; exit 1; }
+        for v in "${built[@]}"; do
+            while IFS= read -r arm; do
+                log "KL divergence $n $arm against FP32"
+                planned "$arm" env -u GGML_CUDA_F32_REF "$(ppl_for "$v")" "${kld_args[@]}" --kl-divergence
+                run_arm "$arm" env -u GGML_CUDA_F32_REF "$(ppl_for "$v")" "${kld_args[@]}" --kl-divergence \
+                    > "$OUT/$arm.$n.kld.txt" 2>&1 || { log "kld arm failed for $n $arm"; exit 1; }
+                for metric in 'Mean[[:space:]]+KLD:' 'Maximum KLD:' 'RMS Δp[[:space:]]*:' 'Same top p:'; do
+                    grep -Eq "$metric" "$OUT/$arm.$n.kld.txt" || { log "kld metric missing for $n $arm: $metric"; exit 1; }
+                done
+            done < <(arms_for "$v")
+        done
+        rm -f -- "$kld_base"
+        kld_base=
+    fi
     if has lb; then
         for ((i = 1; i <= LB_ROUNDS; i++)); do
             for v in "${built[@]}"; do
@@ -330,6 +399,13 @@ done
               echo "- $arm ($arm.$n.ppl.txt):"
               grep -E 'PPL.*(\+/-|±)' "$OUT/$arm.$n.ppl.txt" | tail -1 || echo "  final PPL +/- error missing; inspect log"
           done
+        fi
+        if [ "$KLD_READY" = 1 ]; then
+            echo; echo "## KL divergence $n against FP32 (512 context, $KLD_CHUNKS chunks, batch/ubatch $KLD_UB)"; echo
+            for arm in "${arms[@]}"; do
+                echo "- $arm ($arm.$n.kld.txt):"
+                grep -E 'Mean[[:space:]]+KLD:|Maximum KLD:|RMS Δp[[:space:]]*:|Same top p:' "$OUT/$arm.$n.kld.txt"
+            done
         fi
     done
 } > "$OUT/summary.md"
