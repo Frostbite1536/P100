@@ -67,6 +67,10 @@ if(Python3_Interpreter_FOUND)
     COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/bench/analyze.py tbo
             ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/tbo-perf-cpu.sql ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/tbo-perf-cpu.sql)
   set_tests_properties(analyze_tbo PROPERTIES PASS_REGULAR_EXPRESSION "type_V=q8_0 \\| [0-9.]+ ms \\| [0-9.]+ ms \\| 1\\.00×")
+  add_test(NAME mm_gbps
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/fixtures/mm-gbps/check.py)
+  set_tests_properties(mm_gbps PROPERTIES
+    PASS_REGULAR_EXPRESSION "mm_gbps: hand-calculated GB/s, medians, labels and rooflines passed")
   # llama-bench rounds (bench/patches/run.sh): a comma-joined group is summarised as median (min-max, n).
   add_test(NAME analyze_lb_rounds
     COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/bench/analyze.py lb

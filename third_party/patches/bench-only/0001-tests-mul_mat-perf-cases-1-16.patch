@@ -1,0 +1,42 @@
+From a3a38383a19467daacce3659daed8f12cc6678dd Mon Sep 17 00:00:00 2001
+From: P100 bench <p100-bench@localhost>
+Date: Fri, 16 Oct 2026 08:33:51 -0500
+Subject: [PATCH] tests: extend MUL_MAT perf cases to 1-16 tokens for local A/B
+ kit
+
+---
+ tests/test-backend-ops.cpp | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
+
+diff --git a/tests/test-backend-ops.cpp b/tests/test-backend-ops.cpp
+index 4e3c6942b..7d0abcaf1 100644
+--- a/tests/test-backend-ops.cpp
++++ b/tests/test-backend-ops.cpp
+@@ -12136,6 +12136,24 @@ static std::vector<std::unique_ptr<test_case>> make_test_cases_perf() {
+         }
+     }
+ 
++    // MUL_MAT token counts 1-16 for the local A/B kit.
++    for (ggml_type type_a : {GGML_TYPE_Q4_0, GGML_TYPE_Q8_0, GGML_TYPE_Q4_K, GGML_TYPE_Q5_K, GGML_TYPE_Q6_K}) {
++        for (const std::array<int64_t, 2> & shape : {
++                std::array<int64_t, 2>{4096, 4096}, {1024, 4096}, {14336, 4096}, {4096, 14336}}) {
++            const int64_t m = shape[0];
++            const int64_t k = shape[1];
++            for (int n = 1; n <= 16; ++n) {
++                if (m == 4096 && k == 14336 && (n <= 5 || n == 8)) {
++                    continue;
++                }
++                if (type_a == GGML_TYPE_Q4_K && k == 4096 && (m == 4096 || m == 14336) && (n <= 4 || n == 8)) {
++                    continue;
++                }
++                test_cases.emplace_back(new test_mul_mat(type_a, GGML_TYPE_F32, m, n, k, {1, 1}, {1, 1}));
++            }
++        }
++    }
++
+     // Q4_K multi-column mat-vec
+     for (int64_t m : {4096, 6144, 6272, 14336}) {
+         for (int bs : {1, 2, 3, 4, 8}) {
+-- 
+2.43.0
+

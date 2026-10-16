@@ -32,21 +32,33 @@ print('-- FAKE synthetic timings for plumbing tests only')
 print('CREATE TABLE test_backend_ops (op_name TEXT, op_params TEXT, supported INTEGER, time_us REAL, test_mode TEXT);')
 count = 0
 if op == 'MUL_MAT' and '-p' in opts:
-    # Positive cases and controls: unsupported types/RHS, n outside 1..8,
+    # Positive cases and controls: unsupported types/RHS/shapes, n outside 1..16,
     # permuted tensors and strided views must all be excluded by the runner.
-    for dtype, rhs, n, per, view in itertools.product(
+    for dtype, rhs, (m, k), n, per, view in itertools.product(
             ('q4_0', 'q8_0', 'q4_K', 'q5_K', 'q6_K', 'f16', 'q4_0_extra'),
-            ('f32', 'f16'), (0, *range(1, 9), 9, 10, 18),
+            ('f32', 'f16'),
+            ((4096, 4096), (1024, 4096), (14336, 4096), (4096, 14336),
+             (129, 4096), (1024, 14336), (14336, 14336), (4096, 143360)),
+            (0, *range(1, 17), 17, 18, 160),
             ('[0,1,2,3]', '[1,0,2,3]'), (0, 1, 10)):
-        params = f'type_a={dtype},type_b={rhs},m=129,n={n},k=4096,bs=[1,1],nr=[1,1],per={per},v={view}'
+        params = f'type_a={dtype},type_b={rhs},m={m},n={n},k={k},bs=[1,1],nr=[1,1],per={per},k_v={view},o=1,src_overlap=0,m_v=0,pad=0'
         selected = bool(re.search(opts['-p'], params))
         expected = (dtype in ('q4_0', 'q8_0', 'q4_K', 'q5_K', 'q6_K') and rhs == 'f32'
-                    and 1 <= n <= 8 and per == '[0,1,2,3]' and view == 0)
+                    and (m, k) in ((4096, 4096), (1024, 4096), (14336, 4096), (4096, 14336))
+                    and 1 <= n <= 16 and per == '[0,1,2,3]' and view == 0)
         assert selected == expected, f'incorrect contiguous decode filter: {params}'
         if selected:
             print(f"INSERT INTO test_backend_ops VALUES ('{op}', '{params}', 1, 1000.0, 'perf');")
             count += 1
-    assert count == 40, f'perf filter lost required shapes: {count}/40'
+    assert count == 320, f'perf filter lost required shapes: {count}/320'
+    # Batched cases have a different byte count and must not enter mmperf.
+    for bs, nr in (('[2,1]', '[1,1]'), ('[1,1]', '[2,1]')):
+        params = f'type_a=q4_K,type_b=f32,m=4096,n=16,k=4096,bs={bs},nr={nr},per=[0,1,2,3],k_v=0,o=1,src_overlap=0,m_v=0,pad=0'
+        assert not re.search(opts['-p'], params), params
+    for field, value in (('o', 2), ('src_overlap', 1), ('m_v', 8192), ('pad', 16)):
+        params = 'type_a=q4_K,type_b=f32,m=4096,n=16,k=4096,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1,src_overlap=0,m_v=0,pad=0'
+        params = re.sub(rf'\b{field}=\d+', f'{field}={value}', params)
+        assert not re.search(opts['-p'], params), params
     sys.exit(0)
 for hs, gqa, kv, nb, dtype in itertools.product((128, 256), (4, 6, 8), (4096, 32768), (3, 4, 8, 16), ('f16', 'q8_0', 'q4_0')):
     params = f'hsk={hs},hsv={hs},nh=4,nr23=[{gqa},1],kv={kv},nb={nb},mask=1,type_K={dtype},type_V={dtype}'

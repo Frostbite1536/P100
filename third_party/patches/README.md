@@ -17,3 +17,14 @@ outputs: [bench/results/maxwell-patches-2026-10-10/README.md](../../bench/result
 volta-fa measured both on a V100 (bit-identical, conversion 1.7–6.9× faster) and a Maxwell laptop GPU
 (2.6–5.2×): `~/Github/volta-fa/docs/research/patches-cloud-2026-10-10.md` §2. volta-fa `0001`–`0004` are
 Volta tensor-core or Volta-routing changes and do not apply here.
+
+## Bench-only patches
+
+These patches live in `bench-only/`, apply after each variant's series patches,
+and are never part of the upstream series. The runner selects rows marked
+`all variants` by filename; patches scoped to one build must use a different
+entry in the applies-to column.
+
+| patch | applies to | provenance | purpose / upstream policy |
+| --- | --- | --- | --- |
+| `bench-only/0001-tests-mul_mat-perf-cases-1-16.patch` | all variants | this repo, one `git format-patch` commit against `79e2e74eb` | 280 additional MUL_MAT perf cases: five quantised types, four Llama-3.1-8B shapes, n=1–16, skipping existing cases; eval list untouched; never upstream |
