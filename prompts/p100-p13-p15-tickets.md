@@ -41,6 +41,20 @@ Process, strictly one ticket at a time (all three edit bench/patches/run.sh):
    Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>
    Then move to the next ticket.
 
+Harness gaps the tickets do not cover (found by the first session, 2026-10-16;
+add a "manager note" to each ticket before dispatch):
+- A worktree has no third_party/llama.cpp (it is gitignored). The worker makes a
+  private clone, git clone --no-hardlinks /home/p51/Github/P100/third_party/llama.cpp
+  build/llama-<ticket>, and checks out the pin (bench/LLAMA_COMMIT). It never
+  writes to the main checkout's tree.
+- Git writes are allowed in that private clone (apply, commit, format-patch),
+  and nowhere in the P100 repo. Change the rules line to say so.
+- The worker sandbox has no GPU. GPU ctests may fail or skip there; the worker
+  names them. Maxwell runs (p14's positive control, p15's two builds) are yours,
+  outside the sandbox. Tell the worker to prepare the commands, not run them.
+- "Applies" means git apply --check on fresh checkouts of the pin: alone, after
+  0003 (the upstream variant), and after 0001–0006 (the all variant).
+
 Ticket-specific checks:
 - p13: patches go in the new third_party/patches/bench-only/. No duplicate perf
   case names. bin/mm-gbps.py peak defaults to 732. Once it is committed, tell me:
