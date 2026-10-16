@@ -105,13 +105,22 @@ with tempfile.TemporaryDirectory(prefix=f'p100-{kind}-') as tmp:
             for v in variants:
                 for op, tag in (('FLASH_ATTN_EXT', 'fa'), ('MUL_MAT', 'mulmat')):
                     require(f'{v}.{tag}-test-CUDA0.txt', 'passed')
-                    call('tbo', 'test', v, **{'-o': op, '-b': 'CUDA0'})
+                    full = {'-p': '^(?!.*src1_scale=)'} if op == 'MUL_MAT' else {}
+                    call('tbo', 'test', v, **{'-o': op, '-b': 'CUDA0', **full})
                     if tag == 'fa':
                         require(f'{v}.fa-vbias-test-CUDA0.txt', '16/16 passed')
                         call('tbo', 'test', v, **{'-o': op, '-b': 'CUDA0', '-p': 'v_bias'})
                 if 5 in patch_lists[v]:
                     require(f'{v}-nommvh.mulmat-test-CUDA0.txt', 'passed')
-                    call('tbo', 'test', v + '-nommvh', **{'-o': 'MUL_MAT', '-b': 'CUDA0'})
+                    call('tbo', 'test', v + '-nommvh', **{'-o': 'MUL_MAT', '-b': 'CUDA0', '-p': '^(?!.*src1_scale=)'})
+                for arm in ((v, v + '-nommvh') if 5 in patch_lists[v] else (v,)):
+                    passed = 40 if arm.endswith('-nommvh') else 80
+                    count = f'{passed}/80 tests passed'
+                    require(f'{arm}.range.txt', 'FAKE activation range')
+                    require(f'{arm}.range.txt', count)
+                    assert f'- {arm} ({arm}.range.txt):\n    {count}' in summary
+                    call('tbo', 'test', arm, **{'-o': 'MUL_MAT', '-b': 'CUDA0', '-p': 'src1_scale'})
+            assert "## Activation range: cases fail on upstream's q8_1 path by design (not a regression signal)" in summary
             for r in range(1, rounds + 1):
                 if fa_perf:
                     for v in variants:
@@ -148,6 +157,7 @@ with tempfile.TemporaryDirectory(prefix=f'p100-{kind}-') as tmp:
             applied = re.findall(r'DRYRUN: git -C .*?/([^/ ]+) apply [^\n]*/patches/(000[1-6])-[^\n]+', log)
             assert applied == [(v, f'{ordinal:04d}') for v in variants for ordinal in patch_lists[v]], applied
             # Shared patches follow the series in every variant, selected by README scope.
+            range_patch = 'bench-only/0003-tests-mul_mat-activation-range.patch'
             shared = 'bench-only/0001-tests-mul_mat-perf-cases-1-16.patch'
             all_applied = re.findall(r'DRYRUN: git -C .*?/([^/ ]+) apply [^\n]*/patches/([^\n]+)', log)
             expected_patches = []
@@ -155,15 +165,21 @@ with tempfile.TemporaryDirectory(prefix=f'p100-{kind}-') as tmp:
                 for ordinal in patch_lists[v]:
                     patch, = (root / 'third_party/patches').glob(f'{ordinal:04d}-*.patch')
                     expected_patches.append((v, patch.name))
-                expected_patches.append((v, shared))
+                expected_patches.extend((v, p) for p in (shared, range_patch))
             assert all_applied == expected_patches, all_applied
             require('env.txt', shared.rsplit('/', 1)[1])
+            require('env.txt', range_patch.rsplit('/', 1)[1])
             assert log.count('--target test-backend-ops llama-bench llama-perplexity') == len(variants)
             assert re.findall(r'MUL_MAT perf ([\w-]+) round (\d+)', log) == [(a, str(r)) for r in range(1, rounds + 1) for a in arms]
             commands = [line for line in log.splitlines() if 'DRYRUN command:' in line]
             # The regex argument is shell-escaped; look at calls for its full semantics
             # (the backend shim checks every positive and negative filter control).
             assert sum('perf -o MUL_MAT' in line for line in commands) == len(arms) * rounds
+            range_commands = [line for line in commands if 'test -b CUDA0 -o MUL_MAT -p src1_scale' in line]
+            assert len(range_commands) == len(arms)
+            assert sum('GGML_CUDA_DISABLE_MMVH=1' in line for line in range_commands) == sum(a.endswith('-nommvh') for a in arms)
+            assert re.findall(r'activation range ([\w-]+) \(MUL_MAT', log) == list(arms)
+            assert log.count('range rc=1') == sum(a.endswith('-nommvh') for a in arms)
             assert sum(' -p 0 -n 128 -d ' in line for line in commands) == len(arms) * lb_rounds * len(models) * 2
             assert sum(' --chunks 32 ' in line for line in commands) == len(arms) * len(models)
             assert summary.count('FAKE Final estimate: PPL = 10.0000 +/- 0.1000') == len(arms) * len(models)
@@ -229,10 +245,12 @@ with tempfile.TemporaryDirectory(prefix=f'p100-{kind}-') as tmp:
             if build:
                 shared = 'bench-only/0001-tests-mul_mat-perf-cases-1-16.patch'
                 ref_patch = 'bench-only/0002-cuda-f32-reference-matmul-dev-switch.patch'
+                range_patch = 'bench-only/0003-tests-mul_mat-activation-range.patch'
                 series3, = (root / 'third_party/patches').glob('0003-*.patch')
-                assert [p for v, p in applied if v == 'ref'] == [series3.name, shared, ref_patch]
+                assert [p for v, p in applied if v == 'ref'] == [series3.name, shared, range_patch, ref_patch]
                 assert [(v, p) for v, p in applied if p == ref_patch] == [('ref', ref_patch)]
                 assert [v for v, p in applied if p == shared] == [*variants, 'ref']
+                assert [v for v, p in applied if p == range_patch] == [*variants, 'ref']
                 assert log.count('--target llama-perplexity\n') == 1
                 assert log.count('--target test-backend-ops llama-bench llama-perplexity') == len(variants)
             else:

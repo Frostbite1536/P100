@@ -22,6 +22,20 @@ with open(os.environ['SHIM_CALL_LOG'], 'a') as f:
                            disable_mmvh=os.environ.get('GGML_CUDA_DISABLE_MMVH'))) + '\n')
 if mode != 'perf':
     if '-p' in opts:
+        if op == 'MUL_MAT' and opts['-p'] == 'src1_scale':
+            assert mode == 'test' and opts['-b'] == 'CUDA0'
+            disabled = os.environ.get('GGML_CUDA_DISABLE_MMVH') == '1'
+            print('FAKE activation range counts for plumbing only; no hardware tested')
+            print(f'  {40 if disabled else 80}/80 tests passed')
+            sys.exit(1 if disabled else 0)
+        if op == 'MUL_MAT':
+            # Full correctness must keep every pre-range case and drop only the range cases.
+            assert mode == 'test' and opts['-p'] == '^(?!.*src1_scale=)', opts
+            base = 'type_a=q4_K,type_b=f32,m=4096,n=8,k=1024,bs=[1,1],nr=[1,1],per=[0,1,2,3],k_v=0,o=1,src_overlap=0,m_v=0,pad=0'
+            assert re.search(opts['-p'], base)
+            assert not re.search(opts['-p'], base + ',src1_scale=100000.000000')
+            print(f'FAKE {op} {opts["-b"]}: OK; 1/1 passed (no hardware tested)')
+            sys.exit(0)
         assert mode == 'test' and op == 'FLASH_ATTN_EXT' and opts['-p'] == 'v_bias'
         print(f'FAKE biased V v_bias=2.000000 {opts["-b"]}: OK; 16/16 passed (no hardware tested)')
         sys.exit(0)

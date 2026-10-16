@@ -1,0 +1,76 @@
+From cebcf39305bc880c8ae8ccb8d8990baecaa6bb79 Mon Sep 17 00:00:00 2001
+From: P100 bench <p100-bench@localhost>
+Date: Fri, 16 Oct 2026 09:52:19 -0500
+Subject: [PATCH] tests: bench-only MUL_MAT activation range cases
+
+Port test_mul_mat_range from volta-fa local 0009 to the llama.cpp pin. Add 80 eval-only cases; skip Q4_0/Q8_0 at 1e-5 because the CPU reference Q8_0 FP16 scale underflows. Q4_K/Q5_K/Q6_K use Q8_K with FP32 scale.
+
+Fails on upstream by design; never upstream.
+---
+ tests/test-backend-ops.cpp | 43 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 43 insertions(+)
+
+diff --git a/tests/test-backend-ops.cpp b/tests/test-backend-ops.cpp
+index 4e3c6942b..0ad2c40f1 100644
+--- a/tests/test-backend-ops.cpp
++++ b/tests/test-backend-ops.cpp
+@@ -7459,6 +7459,33 @@ struct test_mul_mat_pos : public test_mul_mat {
+     }
+ };
+ 
++// mul_mat with src1 values of very different magnitudes per 256-value slice (x scale, scale/64, scale/4096): beyond the
++// FP16 range for scale = 1e5, in its subnormal range for scale = 1e-5, for kernels that convert activations to FP16
++struct test_mul_mat_range : public test_mul_mat {
++    const float scale;
++
++    test_mul_mat_range(ggml_type type_a, int64_t m, int64_t n, int64_t k, float scale)
++        : test_mul_mat(type_a, GGML_TYPE_F32, m, n, k, {1, 1}, {1, 1}), scale(scale) {}
++
++    std::string vars() override {
++        return test_mul_mat::vars() + ",src1_scale=" + var_to_str(scale);
++    }
++
++    void initialize_tensors(ggml_context * ctx) override {
++        for (ggml_tensor * t = ggml_get_first_tensor(ctx); t != nullptr; t = ggml_get_next_tensor(ctx, t)) {
++            init_tensor_uniform(t);
++            if (t->type == GGML_TYPE_F32) {
++                std::vector<float> v(ggml_nelements(t));
++                ggml_backend_tensor_get(t, v.data(), 0, ggml_nbytes(t));
++                for (size_t i = 0; i < v.size(); ++i) {
++                    v[i] *= scale / float(1 << (6*((i / 256) % 3)));
++                }
++                ggml_backend_tensor_set(t, v.data(), 0, ggml_nbytes(t));
++            }
++        }
++    }
++};
++
+ enum mul_mat_add_mode {
+     MUL_MAT_ADD_MM_RES,     // mm + res
+     MUL_MAT_ADD_RES_MM,     // res + mm
+@@ -10732,6 +10759,22 @@ static std::vector<std::unique_ptr<test_case>> make_test_cases_eval() {
+     }
+ #endif
+ 
++    // Activation-range cases are bench-only: upstream q8_1 paths fail by design.
++    for (ggml_type type_a : { GGML_TYPE_Q4_0, GGML_TYPE_Q8_0, GGML_TYPE_Q4_K, GGML_TYPE_Q5_K, GGML_TYPE_Q6_K }) {
++        for (int n : { 1, 2, 4, 8, 16 }) {
++            for (int m : { 128, 4096 }) {
++                for (float scale : { 1e5f, 1e-5f }) {
++                    // Q4_0/Q8_0 use Q8_0 for the CPU reference dot product: its FP16 d underflows at 1e-5.
++                    // Q4_K/Q5_K/Q6_K use Q8_K with FP32 d, so their reference is valid at both scales.
++                    if (scale < 1.0f && (type_a == GGML_TYPE_Q4_0 || type_a == GGML_TYPE_Q8_0)) {
++                        continue;
++                    }
++                    test_cases.emplace_back(new test_mul_mat_range(type_a, m, n, 1024, scale));
++                }
++            }
++        }
++    }
++
+ #if 1
+     for (ggml_type type_a : base_types) {
+         for (ggml_type type_b : {GGML_TYPE_F32, GGML_TYPE_F16}) {
+-- 
+2.43.0
+
