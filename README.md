@@ -17,3 +17,9 @@ run on a P100 yet, so there are no performance claims here.
 bin/setup-dev.sh && export PATH=$PWD/.venv/bin:$PATH
 cmake -S . -B build -G Ninja && cmake --build build && ctest --test-dir build --output-on-failure
 ```
+
+## License
+
+AGPL-3.0 ([LICENSE](LICENSE)). The patch series in `third_party/patches/` is additionally
+available under llama.cpp's MIT license so it can be merged upstream without relicensing
+this repo; everything else is AGPL-3.0 only.
